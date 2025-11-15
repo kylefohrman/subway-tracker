@@ -6,9 +6,10 @@ import pytz
 config = dotenv_values(".env")
 
 API_KEY = config["API_KEY"]
-BASE_URL = config["BASE_URL"]
+REGION = config["REGION"]
+BASE_URL = 'https://api.pugetsound.onebusaway.org/api/'
 STOP_ID = "40_99610" # Cap Hill Station
-time_zone = pytz.timezone('America/Los_Angeles')
+time_zone = pytz.timezone(REGION)
 
 # client = onebusaway.OneBusAwayClient(
 #     api_key=YOUR_API_KEY,
