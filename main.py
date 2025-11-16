@@ -35,17 +35,11 @@ pygame.display.set_caption("Subway Arrival Board")
 # Colors and Fonts
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 200, 0)
+YELLOW = (255, 255, 0)
+GREEN = (0, 255, 100)
 
-# Load a font (or use pygame.font.SysFont(None, size))
-try:
-    FONT_LARGE = pygame.font.Font(None, 48) 
-    FONT_SMALL = pygame.font.Font(None, 30)
-except pygame.error as e:
-    # Fallback if no font is found
-    FONT_LARGE = pygame.font.SysFont('dejavusans', 48)
-    FONT_SMALL = pygame.font.SysFont('dejavusans', 30)
+FONT_LARGE = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 48)
+FONT_SMALL = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 30)
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
@@ -149,7 +143,7 @@ while running:
             # ... (Rest of your drawing code using minutes_until, arrival['route'], etc.) ...
             
             # Example drawing using the new variables:
-            color = RED if arrival['status'] == 'LATE' else GREEN
+            color = YELLOW if arrival['status'] == 'LATE' else GREEN
             minutes_text = FONT_LARGE.render(f"{minutes_until} min", True, color)
             
             row_y = y_offset + (i * 60)
