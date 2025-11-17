@@ -188,7 +188,7 @@ while running:
     # 3. Drawing/Rendering (High Frequency)
     screen.fill(BLACK) 
     clock_display.draw()
-    y_offset = BAR_HEIGHT + 20
+    y_offset = BAR_HEIGHT + 10
 
     # Assuming FONT_LARGE is the largest element, calculate its height once
     FONT_HEIGHT = FONT_LARGE.get_height() 
@@ -202,7 +202,7 @@ while running:
         for i, arrival in enumerate(global_arrival_data):
             text_color = WHITE
             # 1. Define the top edge of the current row block
-            ROW_TOP_Y = BAR_HEIGHT + 20 + (i * ROW_SPACING)
+            ROW_TOP_Y = y_offset + (i * ROW_SPACING)
 
             # 2. Calculate the center Y-coordinate for all elements in this row
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
