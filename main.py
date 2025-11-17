@@ -5,6 +5,7 @@ from dotenv import dotenv_values
 import onebusaway
 from datetime import datetime
 import pytz
+from clock_display import ClockDisplay
 
 config = dotenv_values(".env")
 
@@ -28,7 +29,7 @@ pygame.font.init() # Initialize the font module
 
 # Display Setup
 # Replace with the size of your Raspberry Pi screen/monitor
-SCREEN_WIDTH = 800
+SCREEN_WIDTH = 1024
 SCREEN_HEIGHT = 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Subway Arrival Board")
@@ -43,12 +44,24 @@ LINE_2_COLOR = (0,162,224)
 BUS_COLOR = (255,116,65)
 STREETCAR_COLOR = (157,28,34)
 
-FONT_LARGE = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 60)
-FONT_SMALL = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 42)
+FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
+CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
+FONT_LARGE = pygame.font.Font(FONT_PATH, 60)
+FONT_SMALL = pygame.font.Font(FONT_PATH, 42)
+BAR_HEIGHT = 40
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
 FPS = 30
+
+clock_display = ClockDisplay(
+    screen=screen,
+    screen_width=SCREEN_WIDTH,
+    screen_height=SCREEN_HEIGHT,
+    font_path=CLOCK_FONT,
+    time_zone_str=REGION, # Use the time zone loaded from .env
+    bar_height=BAR_HEIGHT
+)
 
 # client = onebusaway.OneBusAwayClient(
 #     api_key=API_KEY,
@@ -163,12 +176,13 @@ while running:
 
     # 3. Drawing/Rendering (High Frequency)
     screen.fill(BLACK) 
-    y_offset = 20
+    clock_display.draw()
+    y_offset = BAR_HEIGHT + 20
 
     # Assuming FONT_LARGE is the largest element, calculate its height once
     FONT_HEIGHT = FONT_LARGE.get_height() 
     TEXT_CENTER_OFFSET = FONT_HEIGHT // 2
-    ROUTE_CIRCLE_RADIUS = 40 # Increase this size for prominence (e.g., from 15 to 25)
+    ROUTE_CIRCLE_RADIUS = 35 # Increase this size for prominence (e.g., from 15 to 25)
     ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + 10 # Total height for the row area
     X_ROUTE = ROUTE_CIRCLE_RADIUS + 10 # X position for the circle center
 
@@ -177,7 +191,7 @@ while running:
         for i, arrival in enumerate(global_arrival_data):
             text_color = WHITE
             # 1. Define the top edge of the current row block
-            ROW_TOP_Y = 20 + (i * ROW_SPACING)
+            ROW_TOP_Y = BAR_HEIGHT + 20 + (i * ROW_SPACING)
 
             # 2. Calculate the center Y-coordinate for all elements in this row
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
