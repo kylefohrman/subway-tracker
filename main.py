@@ -14,6 +14,7 @@ TIME_ZONE = pytz.timezone(REGION)
 BASE_URL = 'https://api.pugetsound.onebusaway.org/api/'
 LINK_STOP_ID = "40_99610" # Cap Hill Station
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
+STREETCAR_STOP_ID = "11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
 time_zone = pytz.timezone(REGION)
 
@@ -28,7 +29,7 @@ pygame.font.init() # Initialize the font module
 # Display Setup
 # Replace with the size of your Raspberry Pi screen/monitor
 SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 480
+SCREEN_HEIGHT = 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Subway Arrival Board")
 
@@ -37,9 +38,13 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 0)
 GREEN = (0, 255, 100)
+LINE_1_COLOR = (41,130,64)
+LINE_2_COLOR = (0,162,224)
+BUS_COLOR = (255,116,65)
+STREETCAR_COLOR = (157,28,34)
 
-FONT_LARGE = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 48)
-FONT_SMALL = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 30)
+FONT_LARGE = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 60)
+FONT_SMALL = pygame.font.Font('fonts/Roboto/static/Roboto_Condensed-Black.ttf', 42)
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
@@ -77,7 +82,7 @@ def fetch_transit_data():
         DATE=16
         global_arrival_data = [
             {
-                'route': '1',
+                'route': '2',
                 'headsign': 'Lynwood',
                 # Arrival at 6:04 PM (4 minutes from now)
                 'predicted_arrival_time': 0,
@@ -93,21 +98,44 @@ def fetch_transit_data():
                 # Arrival at 6:04 PM (4 minutes from now)
                 'predicted_arrival_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
                 'predicted_departure_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 11, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 11, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
                 'predicted': True,
                 'status': 'LATE'
             },
             {
-                'route': '1',
-                'headsign': 'Lynwood',
+                'route': '8',
+                'headsign': 'Seattle Center',
                 # Arrival at 6:15 PM (15 minutes from now)
                 'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
                 'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
                 'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
                 'scheduled_departure_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
+                'predicted': True,
                 'status': 'EARLY'
-            }
+            },
+            {
+                'route': 'Streetcar',
+                'headsign': 'Pioneer Square',
+                # Arrival at 6:15 PM (15 minutes from now)
+                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
+                'predicted': True,
+                'status': 'EARLY'
+            },
+            {
+                'route': '2',
+                'headsign': 'Lynwood',
+                # Arrival at 6:04 PM (4 minutes from now)
+                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 10, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 10, 0, tzinfo=TIME_ZONE),
+                'predicted': True,
+                'status': 'ON TIME'
+            },
         ]
 
     except Exception as e:
@@ -137,22 +165,79 @@ while running:
     screen.fill(BLACK) 
     y_offset = 20
 
+    # Assuming FONT_LARGE is the largest element, calculate its height once
+    FONT_HEIGHT = FONT_LARGE.get_height() 
+    TEXT_CENTER_OFFSET = FONT_HEIGHT // 2
+    ROUTE_CIRCLE_RADIUS = 40 # Increase this size for prominence (e.g., from 15 to 25)
+    ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + 10 # Total height for the row area
+    X_ROUTE = ROUTE_CIRCLE_RADIUS + 10 # X position for the circle center
+
     if global_arrival_data:
         # Loop through the GLOBAL data list updated by the thread
         for i, arrival in enumerate(global_arrival_data):
-            
-            # Calculate minutes until arrival in real-time
-            time_until = arrival['scheduled_arrival_time'] - datetime.now(TIME_ZONE)
-            minutes_until = int(time_until.total_seconds() / 60)
+            text_color = WHITE
+            # 1. Define the top edge of the current row block
+            ROW_TOP_Y = 20 + (i * ROW_SPACING)
 
-            # ... (Rest of your drawing code using minutes_until, arrival['route'], etc.) ...
+            # 2. Calculate the center Y-coordinate for all elements in this row
+            ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
+
+            if arrival.get('predicted', False):
+                time_until = arrival['predicted_arrival_time'] - datetime.now(TIME_ZONE)
+                time_diff = arrival['predicted_arrival_time'] - arrival['scheduled_arrival_time']
+                if time_diff.total_seconds() >= 60:
+                    text_color = YELLOW
+                elif time_diff.total_seconds() <= -60:
+                    text_color = GREEN
+            else:
+                # Calculate minutes until arrival in real-time
+                time_until = arrival['scheduled_arrival_time'] - datetime.now(TIME_ZONE)
+
+            minutes_until = int(time_until.total_seconds() / 60)
+            minutes_str = f"{minutes_until} min"
+
+            # --- B. Prepare Text Surfaces and Circle ---
+        
+            # 1. Route Number Circle
+            route_number = str(arrival['route']) # Ensure it's a string
             
-            # Example drawing using the new variables:
-            color = YELLOW if arrival['status'] == 'LATE' else GREEN
-            minutes_text = FONT_LARGE.render(f"{minutes_until} min", True, color)
-            
-            row_y = y_offset + (i * 60)
-            screen.blit(minutes_text, (SCREEN_WIDTH - 150, row_y))
+            # Blit the circle
+            if route_number == '1':
+                line_color = LINE_1_COLOR
+            elif route_number == '2':
+                line_color = LINE_2_COLOR
+            elif route_number == '8':
+                line_color = BUS_COLOR
+            elif route_number == 'Streetcar':
+                route_number = 'S'
+                line_color = STREETCAR_COLOR
+            # Render the route number for placement inside the circle
+            route_num_surface = FONT_LARGE.render(route_number, True, WHITE) # Use a smaller font for the number
+            pygame.draw.circle(screen, line_color, (X_ROUTE, ROW_CENTER_Y), ROUTE_CIRCLE_RADIUS)
+
+            # Center the route number text on the circle
+            route_num_rect = route_num_surface.get_rect(center=(X_ROUTE, ROW_CENTER_Y))
+            screen.blit(route_num_surface, route_num_rect)
+
+            # 2. Headsign Text
+            headsign_text = arrival['headsign']
+            headsign_x_pos = X_ROUTE + ROUTE_CIRCLE_RADIUS + 10 # 10 pixels gap after the circle
+            headsign_surface = FONT_LARGE.render(headsign_text, True, WHITE) # Use WHITE for headsign
+            screen.blit(
+                headsign_surface, 
+                (headsign_x_pos, ROW_CENTER_Y - TEXT_CENTER_OFFSET) # Subtract half height
+            )
+
+            # 3. Minutes until Arrival Text
+            minutes_text_surface = FONT_LARGE.render(minutes_str, True, text_color)
+            minutes_x_pos = SCREEN_WIDTH - minutes_text_surface.get_width() - 10
+            screen.blit(
+                minutes_text_surface, 
+                (minutes_x_pos, ROW_CENTER_Y - TEXT_CENTER_OFFSET)
+            )
+
+            # Optional: Add a line separator (e.g., a thin rectangle)
+            # pygame.draw.line(screen, WHITE, (0, row_y + line_spacing - 5), (SCREEN_WIDTH, row_y + line_spacing - 5), 1)
 
     else:
         # Display a loading/error message if the list is empty
