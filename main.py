@@ -13,7 +13,7 @@ REGION = config["REGION"]
 TIME_ZONE = pytz.timezone(REGION)
 BASE_URL = 'https://api.pugetsound.onebusaway.org/api/'
 LINK_STOP_ID = "40_99610" # Cap Hill Station
-BUS_STOP_ID = "" # E Olive Way & Summit Ave E
+BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
 time_zone = pytz.timezone(REGION)
 
@@ -55,53 +55,58 @@ def fetch_transit_data():
     global global_arrival_data, is_fetching_data
     is_fetching_data = True
 
+    new_data = []
+
     try:
         # Without any optional parameters, uses the API default time window
-        # response_data = client.get_arrivals_and_departures_for_stop(
+        # response_link = client.arrival_and_departure.list(
         #     stop_id=LINK_STOP_ID
         #     # minutes_after=10
         # )
 
-        # print(f"Successfully fetched {len(response_data.arrivalsAndDepartures)} arrivals/departures.")
-        # print(response_data)
+        # response_bus = client.arrival_and_departure.list(
+        # stop_id=BUS_STOP_ID)
+
+        # link_arrivals = response_link.data.entry.arrivals_and_departures
+        # bus_arrivals = response_bus.data.entry.arrivals_and_departures
+
+        ### TODO: Handle responses
         print("Transit client not yet initialized")
 
         # Using dummy data until I can obtain OneBusAway API key
+        DATE=16
         global_arrival_data = [
             {
-                'route': 'A',
-                'headsign': 'University Station',
+                'route': '1',
+                'headsign': 'Lynwood',
                 # Arrival at 6:04 PM (4 minutes from now)
-                'arrival_time': datetime(2025, 11, 15, 18, 4, 0, tzinfo=TIME_ZONE),
+                'predicted_arrival_time': 0,
+                'predicted_departure_time': 0,
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 4, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 4, 0, tzinfo=TIME_ZONE),
+                'predicted': False,
                 'status': 'ON TIME'
             },
             {
-                'route': 'C',
-                'headsign': 'Downtown Express',
-                # Arrival at 6:09 PM (9 minutes from now)
-                'arrival_time': datetime(2025, 11, 15, 18, 9, 0, tzinfo=TIME_ZONE),
+                'route': '1',
+                'headsign': 'Angle Lake',
+                # Arrival at 6:04 PM (4 minutes from now)
+                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
+                'predicted_departure_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 11, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 11, 0, tzinfo=TIME_ZONE),
+                'predicted': True,
                 'status': 'LATE'
             },
             {
-                'route': 'A',
-                'headsign': 'Airport',
+                'route': '1',
+                'headsign': 'Lynwood',
                 # Arrival at 6:15 PM (15 minutes from now)
-                'arrival_time': datetime(2025, 11, 15, 18, 15, 0, tzinfo=TIME_ZONE),
-                'status': 'ON TIME'
-            },
-            {
-                'route': 'B',
-                'headsign': 'Redmond via I-90',
-                # Arrival at 6:22 PM (22 minutes from now)
-                'arrival_time': datetime(2025, 11, 15, 18, 22, 0, tzinfo=TIME_ZONE),
+                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
                 'status': 'EARLY'
-            },
-            {
-                'route': 'C',
-                'headsign': 'Downtown Express',
-                # Arrival at 6:28 PM (28 minutes from now)
-                'arrival_time': datetime(2025, 11, 15, 18, 28, 0, tzinfo=TIME_ZONE),
-                'status': 'ON TIME'
             }
         ]
 
