@@ -149,6 +149,17 @@ def fetch_transit_data():
                 'predicted': True,
                 'status': 'ON TIME'
             },
+            {
+                'route': '1',
+                'headsign': 'Lynwood',
+                # Arrival at 6:04 PM (4 minutes from now)
+                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
+                'predicted_departure_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
+                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
+                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
+                'predicted': True,
+                'status': 'LATE'
+            },
         ]
 
     except Exception as e:
