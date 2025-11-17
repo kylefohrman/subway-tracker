@@ -142,7 +142,7 @@ while running:
         for i, arrival in enumerate(global_arrival_data):
             
             # Calculate minutes until arrival in real-time
-            time_until = arrival['arrival_time'] - datetime.now(TIME_ZONE)
+            time_until = arrival['scheduled_arrival_time'] - datetime.now(TIME_ZONE)
             minutes_until = int(time_until.total_seconds() / 60)
 
             # ... (Rest of your drawing code using minutes_until, arrival['route'], etc.) ...
