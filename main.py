@@ -36,7 +36,7 @@ pygame.display.set_caption("Subway Arrival Board")
 
 # Colors and Fonts
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
+BLACK = (23, 29, 34)
 YELLOW = (255, 255, 0)
 GREEN = (0, 255, 100)
 LINE_1_COLOR = (41,130,64)

@@ -11,8 +11,8 @@ class ClockDisplay:
     """
     
     # Configuration
-    BAR_COLOR = (23, 29, 34)
-    SHADOW_COLOR = (0, 0, 0) # Black
+    BAR_COLOR = (35, 44, 51)
+    SHADOW_COLOR = (10, 13, 15) # Black
     TEXT_COLOR = (255, 255, 255) # White
     SHADOW_OFFSET = 3
     PADDING = 10
@@ -41,7 +41,6 @@ class ClockDisplay:
         
         # 1. Draw the Drop Shadow (offset down and right)
         shadow_rect = self.bar_rect.copy()
-        shadow_rect.x += self.SHADOW_OFFSET
         shadow_rect.y += self.SHADOW_OFFSET
         
         # Draw the shadow (only the bottom and right edges will show)
