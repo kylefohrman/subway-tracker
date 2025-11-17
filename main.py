@@ -11,6 +11,7 @@ config = dotenv_values(".env")
 
 API_KEY = config["API_KEY"]
 REGION = config["REGION"]
+STATION_NAME = config["STATION_NAME"]
 TIME_ZONE = pytz.timezone(REGION)
 BASE_URL = 'https://api.pugetsound.onebusaway.org/api/'
 LINK_STOP_ID = "40_99610" # Cap Hill Station
@@ -60,7 +61,8 @@ clock_display = ClockDisplay(
     screen_height=SCREEN_HEIGHT,
     font_path=CLOCK_FONT,
     time_zone_str=REGION, # Use the time zone loaded from .env
-    bar_height=BAR_HEIGHT
+    bar_height=BAR_HEIGHT,
+    station_name = STATION_NAME
 )
 
 # client = onebusaway.OneBusAwayClient(

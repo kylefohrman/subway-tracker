@@ -17,12 +17,13 @@ class ClockDisplay:
     SHADOW_OFFSET = 3
     PADDING = 10
     
-    def __init__(self, screen, screen_width, screen_height, font_path, time_zone_str, bar_height):
+    def __init__(self, screen, screen_width, screen_height, font_path, time_zone_str, bar_height, station_name):
         self.screen = screen
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.time_zone = pytz.timezone(time_zone_str)
         self.bar_height = bar_height
+        self.station_name = station_name
         
         # Define the rectangle for the top bar
         self.bar_rect = pygame.Rect(0, 0, self.screen_width, self.bar_height)
@@ -49,6 +50,22 @@ class ClockDisplay:
         # 2. Draw the Main Bar (covers the rest of the shadow)
         pygame.draw.rect(self.screen, self.BAR_COLOR, self.bar_rect)
 
+    def draw_station_name(self):
+        """Renders and draws the station name in the top left corner."""
+        
+        # Render the text surface
+        text_surface = self.font.render(self.station_name, True, self.TEXT_COLOR)
+        
+        # Calculate the position
+        text_rect = text_surface.get_rect()
+        
+        # Position: Left side of the screen, centered vertically in the bar, with padding
+        text_rect.left = self.PADDING # Left margin
+        text_rect.centery = self.bar_height // 2 
+        
+        # Draw the station name
+        self.screen.blit(text_surface, text_rect)
+    
     def draw_clock(self):
         """Renders and draws the current time in the top right corner."""
         
@@ -73,4 +90,5 @@ class ClockDisplay:
     def draw(self):
         """Combined method to draw the entire status bar."""
         self.draw_top_bar()
+        self.draw_station_name()
         self.draw_clock()
