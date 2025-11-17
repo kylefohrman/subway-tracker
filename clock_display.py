@@ -29,7 +29,7 @@ class ClockDisplay:
         
         # Load the font. Use a smaller size for the clock compared to the main display.
         # Fallback to default if the provided path is not found.
-        font_size = round(bar_height * .75)
+        font_size = round(bar_height * .6)
         try:
             self.font = pygame.font.Font(font_path, font_size)
         except (FileNotFoundError, IOError):

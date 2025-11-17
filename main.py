@@ -48,7 +48,7 @@ FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
 CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
 FONT_LARGE = pygame.font.Font(FONT_PATH, 60)
 FONT_SMALL = pygame.font.Font(FONT_PATH, 42)
-BAR_HEIGHT = 40
+BAR_HEIGHT = 50
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
