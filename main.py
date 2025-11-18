@@ -170,7 +170,7 @@ while running:
 
             minutes_until = int(time_until / 60) # truncate to minute
             if minutes_until > 60:
-                minutes_str = datetime.fromtimestamp(arrival["scheduled_arrival_time"]/1000).strftime("%H:%M")
+                minutes_str = datetime.fromtimestamp(arrival["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
             else:
                 minutes_str = f"{minutes_until} min"
 
