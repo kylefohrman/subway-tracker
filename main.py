@@ -2,7 +2,7 @@ import pygame
 import time
 import threading
 from dotenv import dotenv_values
-import onebusaway
+from onebusaway import OnebusawaySDK
 from datetime import datetime
 import pytz
 from clock_display import ClockDisplay
@@ -13,8 +13,9 @@ API_KEY = config["API_KEY"]
 REGION = config["REGION"]
 STATION_NAME = config["STATION_NAME"]
 TIME_ZONE = pytz.timezone(REGION)
-BASE_URL = 'https://api.pugetsound.onebusaway.org/api/'
-LINK_STOP_ID = "40_99610" # Cap Hill Station
+BASE_URL = 'https://api.pugetsound.onebusaway.org/'
+LINK_STOP_ID_ANGLE_LAKE = "40_99610" # Cap Hill Station to Angle Lake
+LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 STREETCAR_STOP_ID = "11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
@@ -65,10 +66,30 @@ clock_display = ClockDisplay(
     station_name = STATION_NAME
 )
 
-# client = onebusaway.OneBusAwayClient(
-#     api_key=API_KEY,
-#     base_url=BASE_URL
-# )
+client = OnebusawaySDK(**{
+    "api_key" : API_KEY,
+    "base_url" : BASE_URL
+    })
+
+def parse_query(stop):
+    response = client.arrival_and_departure.list(stop_id=stop)
+    arrivals_and_departures = response.data.entry.arrivals_and_departures
+    arr = []
+    for arr_dep in arrivals_and_departures:
+        if arr_dep.scheduled_arrival_time/1000 < datetime.now(TIME_ZONE).timestamp():
+            continue
+        arr.append({
+            "route": arr_dep.route_short_name,
+            "headsign": arr_dep.trip_headsign,
+            "predicted_arrival_time": arr_dep.predicted_arrival_time,
+            "predicted_departure_time": arr_dep.predicted_departure_time,
+            "scheduled_arrival_time": arr_dep.scheduled_arrival_time,
+            "scheduled_departure_time": arr_dep.scheduled_departure_time,
+            "predicted": arr_dep.predicted,
+            "status": arr_dep.status,
+            "trip": arr_dep.trip_id
+        })
+    return arr
 
 def fetch_transit_data():
     """Fetches data from OBA and updates the global data structure."""
@@ -79,90 +100,16 @@ def fetch_transit_data():
 
     try:
         # Without any optional parameters, uses the API default time window
-        # response_link = client.arrival_and_departure.list(
-        #     stop_id=LINK_STOP_ID
-        #     # minutes_after=10
-        # )
+        response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE)
+        response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD)
+        response_bus = parse_query(BUS_STOP_ID)
 
-        # response_bus = client.arrival_and_departure.list(
-        # stop_id=BUS_STOP_ID)
+        ### TODO: Merge similar stops for visibility
 
-        # link_arrivals = response_link.data.entry.arrivals_and_departures
-        # bus_arrivals = response_bus.data.entry.arrivals_and_departures
+        merged_responses = response_link_angle_lake + response_link_lynnwood + response_bus
+        merged_responses = sorted(merged_responses, key=lambda x: x['scheduled_arrival_time'])
 
-        ### TODO: Handle responses
-        print("Transit client not yet initialized")
-
-        # Using dummy data until I can obtain OneBusAway API key
-        DATE=16
-        global_arrival_data = [
-            {
-                'route': '2',
-                'headsign': 'Lynwood',
-                # Arrival at 6:04 PM (4 minutes from now)
-                'predicted_arrival_time': 0,
-                'predicted_departure_time': 0,
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 4, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 4, 0, tzinfo=TIME_ZONE),
-                'predicted': False,
-                'status': 'ON TIME'
-            },
-            {
-                'route': '1',
-                'headsign': 'Angle Lake',
-                # Arrival at 6:04 PM (4 minutes from now)
-                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
-                'predicted_departure_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
-                'predicted': True,
-                'status': 'LATE'
-            },
-            {
-                'route': '8',
-                'headsign': 'Seattle Center',
-                # Arrival at 6:15 PM (15 minutes from now)
-                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
-                'predicted': True,
-                'status': 'EARLY'
-            },
-            {
-                'route': 'Streetcar',
-                'headsign': 'Pioneer Square',
-                # Arrival at 6:15 PM (15 minutes from now)
-                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 15, 0, tzinfo=TIME_ZONE),
-                'predicted': True,
-                'status': 'EARLY'
-            },
-            {
-                'route': '2',
-                'headsign': 'Lynwood',
-                # Arrival at 6:04 PM (4 minutes from now)
-                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'predicted_departure_time': datetime(2025, 11, DATE, 18, 13, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 10, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 10, 0, tzinfo=TIME_ZONE),
-                'predicted': True,
-                'status': 'ON TIME'
-            },
-            {
-                'route': '1',
-                'headsign': 'Lynwood',
-                # Arrival at 6:04 PM (4 minutes from now)
-                'predicted_arrival_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
-                'predicted_departure_time': datetime(2025, 11, DATE, 18, 9, 0, tzinfo=TIME_ZONE),
-                'scheduled_arrival_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
-                'scheduled_departure_time': datetime(2025, 11, DATE, 18, 8, 0, tzinfo=TIME_ZONE),
-                'predicted': True,
-                'status': 'LATE'
-            },
-        ]
+        global_arrival_data = merged_responses
 
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -185,7 +132,6 @@ while running:
         # Start the API call in a new thread so the main loop doesn't freeze
         threading.Thread(target=fetch_transit_data, daemon=True).start()
         last_data_refresh_time = current_time
-        print("Starting threaded data refresh...")
 
     # 3. Drawing/Rendering (High Frequency)
     screen.fill(BLACK) 
@@ -210,17 +156,18 @@ while running:
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
 
             if arrival.get('predicted', False):
-                time_until = arrival['predicted_arrival_time'] - datetime.now(TIME_ZONE)
-                time_diff = arrival['predicted_arrival_time'] - arrival['scheduled_arrival_time']
-                if time_diff.total_seconds() >= 60:
+                now = round(datetime.now(TIME_ZONE).timestamp())
+                time_until = (arrival['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
+                time_diff = (arrival['predicted_arrival_time']/1000 - arrival['scheduled_arrival_time']/1000)
+                if time_diff >= 60:
                     text_color = YELLOW
-                elif time_diff.total_seconds() <= -60:
+                elif time_diff <= -60:
                     text_color = GREEN
             else:
                 # Calculate minutes until arrival in real-time
-                time_until = arrival['scheduled_arrival_time'] - datetime.now(TIME_ZONE)
+                time_until = (arrival['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
 
-            minutes_until = int(time_until.total_seconds() / 60)
+            minutes_until = int(time_until / 60) # truncate to minute
             minutes_str = f"{minutes_until} min"
 
             # --- B. Prepare Text Surfaces and Circle ---
@@ -229,15 +176,23 @@ while running:
             route_number = str(arrival['route']) # Ensure it's a string
             
             # Blit the circle
-            if route_number == '1':
+            if "1 Line" in route_number:
+                route_number = "1"
                 line_color = LINE_1_COLOR
-            elif route_number == '2':
+            elif "2 Line" in route_number:
+                route_number = "2"
                 line_color = LINE_2_COLOR
-            elif route_number == '8':
+            elif "8" in route_number:
+                route_number = "8"
                 line_color = BUS_COLOR
-            elif route_number == 'Streetcar':
+            elif "11" in route_number:
+                route_number = "11"
+                line_color = BUS_COLOR
+            elif "Streetcar" in route_number:
                 route_number = 'S'
                 line_color = STREETCAR_COLOR
+            else:
+                line_color = BLACK
             # Render the route number for placement inside the circle
             route_num_surface = FONT_LARGE.render(route_number, True, WHITE) # Use a smaller font for the number
             pygame.draw.circle(screen, line_color, (X_ROUTE, ROW_CENTER_Y), ROUTE_CIRCLE_RADIUS)
