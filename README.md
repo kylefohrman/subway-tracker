@@ -14,7 +14,7 @@ You will also need a `.env` file, where you will store private data:
 ```
 API_KEY=[Your API Key from OneBusAway]
 REGION="America/Los_Angeles"
-STATION_NAME="Kylehaus Station"
+STATION_NAME="Kylehaus Station" # Custom station name that will appear onscreen
 ```
 
 Afterwards, just run `main.py`
