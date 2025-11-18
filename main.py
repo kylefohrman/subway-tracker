@@ -32,7 +32,7 @@ pygame.font.init() # Initialize the font module
 # Display Setup
 # Replace with the size of your Raspberry Pi screen/monitor
 SCREEN_WIDTH = 1024
-SCREEN_HEIGHT = 600
+SCREEN_HEIGHT = 800
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Upcoming Arrivals")
 
@@ -96,8 +96,6 @@ def fetch_transit_data():
     """Fetches data from OBA and updates the global data structure."""
     global global_arrival_data, is_fetching_data
     is_fetching_data = True
-
-    new_data = []
 
     try:
         # Without any optional parameters, uses the API default time window
@@ -171,6 +169,8 @@ while running:
             minutes_until = int(time_until / 60) # truncate to minute
             if minutes_until > 60:
                 minutes_str = datetime.fromtimestamp(arrival["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
+            elif minutes_until < 1:
+                minutes_str = "Arriving"
             else:
                 minutes_str = f"{minutes_until} min"
 
