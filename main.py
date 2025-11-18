@@ -34,7 +34,7 @@ pygame.font.init() # Initialize the font module
 SCREEN_WIDTH = 1024
 SCREEN_HEIGHT = 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Subway Arrival Board")
+pygame.display.set_caption("Upcoming Arrivals")
 
 # Colors and Fonts
 WHITE = (255, 255, 255)
