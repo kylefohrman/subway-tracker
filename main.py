@@ -111,7 +111,7 @@ def fetch_transit_data():
         global_arrival_data = merged_responses
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred at {datetime.now(TIME_ZONE).strftime("%H:%M")}: {e}")
 
     is_fetching_data = False
 
