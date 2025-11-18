@@ -72,12 +72,13 @@ client = OnebusawaySDK(**{
     })
 
 def parse_query(stop):
-    response = client.arrival_and_departure.list(stop_id=stop)
+    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=40, minutes_before=0)
     arrivals_and_departures = response.data.entry.arrivals_and_departures
+    if len(arrivals_and_departures) == 0:
+        response = client.arrival_and_departure.list(stop_id=stop, minutes_after=300, minutes_before=0)
+        arrivals_and_departures = response.data.entry.arrivals_and_departures[:1]
     arr = []
     for arr_dep in arrivals_and_departures:
-        if arr_dep.scheduled_arrival_time/1000 < datetime.now(TIME_ZONE).timestamp():
-            continue
         arr.append({
             "route": arr_dep.route_short_name,
             "headsign": arr_dep.trip_headsign,
@@ -168,7 +169,10 @@ while running:
                 time_until = (arrival['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
 
             minutes_until = int(time_until / 60) # truncate to minute
-            minutes_str = f"{minutes_until} min"
+            if minutes_until > 60:
+                minutes_str = datetime.fromtimestamp(arrival["scheduled_arrival_time"]/1000).strftime("%H:%M")
+            else:
+                minutes_str = f"{minutes_until} min"
 
             # --- B. Prepare Text Surfaces and Circle ---
         
