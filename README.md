@@ -19,4 +19,11 @@ STATION_NAME="Kylehaus Station" # Custom station name that will appear onscreen
 
 Afterwards, just run `main.py`
 
-<img width="1278" height="743" alt="subway tracker" src="https://github.com/user-attachments/assets/82fad6c6-467f-4080-ad77-d3203de42bac" />
+<img width="1278" height="701" alt="merged_with_streetcar" src="https://github.com/user-attachments/assets/b184fe88-d582-4c9e-9273-ddd4ac329815" />
+
+Times are displayed with the following color codes:
+- White :white_large_square: means the vehicle is *on time*
+- Green :green_square: means the vehicle is *early*
+- Yellow :yellow_square: means the vehicle is *late (1-5 minutes)*
+- Red :red_square: means the vehicle is *very late (>5 minutes)*
+- Grey 🔘 means that real-time tracking is temporarily unavailable for this vehicle
