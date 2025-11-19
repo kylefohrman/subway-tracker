@@ -6,11 +6,14 @@ from onebusaway import OnebusawaySDK
 from datetime import datetime
 import pytz
 from clock_display import ClockDisplay
+from collections import defaultdict
 
 config = dotenv_values(".env")
 
 API_KEY = config["API_KEY"]
 REGION = config["REGION"]
+if REGION is None:
+    REGION = "America/Los_Angeles"
 STATION_NAME = config["STATION_NAME"]
 TIME_ZONE = pytz.timezone(REGION)
 BASE_URL = 'https://api.pugetsound.onebusaway.org/'
@@ -21,7 +24,7 @@ STREETCAR_STOP_ID = "11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
 time_zone = pytz.timezone(REGION)
 
-global_arrival_data = [] 
+global_arrival_data: list[tuple[tuple[str, str], list[dict]]] = [] 
 last_data_refresh_time = 0
 is_fetching_data = False
 
@@ -71,17 +74,19 @@ client = OnebusawaySDK(**{
     "base_url" : BASE_URL
     })
 
-def parse_query(stop):
-    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=40, minutes_before=0)
+def parse_query(stop) -> dict[tuple[str, str], list[dict]]:
+    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
     arrivals_and_departures = response.data.entry.arrivals_and_departures
     if len(arrivals_and_departures) == 0:
+        time.sleep(2)
         response = client.arrival_and_departure.list(stop_id=stop, minutes_after=300, minutes_before=0)
         arrivals_and_departures = response.data.entry.arrivals_and_departures[:1]
-    arr = []
+    arr = defaultdict(list)
     for arr_dep in arrivals_and_departures:
-        arr.append({
-            "route": arr_dep.route_short_name,
-            "headsign": arr_dep.trip_headsign,
+        arr[(
+            arr_dep.route_short_name,
+            arr_dep.trip_headsign
+        )].append({
             "predicted_arrival_time": arr_dep.predicted_arrival_time,
             "predicted_departure_time": arr_dep.predicted_departure_time,
             "scheduled_arrival_time": arr_dep.scheduled_arrival_time,
@@ -90,7 +95,7 @@ def parse_query(stop):
             "status": arr_dep.status,
             "trip": arr_dep.trip_id
         })
-    return arr
+    return dict(arr)
 
 def fetch_transit_data():
     """Fetches data from OBA and updates the global data structure."""
@@ -102,18 +107,57 @@ def fetch_transit_data():
         response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE)
         response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD)
         response_bus = parse_query(BUS_STOP_ID)
+        # response_streetcar = parse_query(STREETCAR_STOP_ID)
 
-        ### TODO: Merge similar stops for visibility
+        merged_responses = []
 
-        merged_responses = response_link_angle_lake + response_link_lynnwood + response_bus
-        merged_responses = sorted(merged_responses, key=lambda x: x['scheduled_arrival_time'])
-
+        for headsign in response_link_lynnwood:
+            merged_responses.append((headsign, response_link_lynnwood[headsign]))
+        for headsign in response_link_angle_lake:
+            merged_responses.append((headsign, response_link_angle_lake[headsign]))
+        for headsign in response_bus:
+            merged_responses.append((headsign, response_bus[headsign]))
+        # for headsign in response_streetcar:
+        #     merged_responses.append((headsign, response_streetcar[headsign]))
         global_arrival_data = merged_responses
 
     except Exception as e:
-        print(f"An error occurred at {datetime.now(TIME_ZONE).strftime("%H:%M")}: {e}")
+        time_str = datetime.now(TIME_ZONE).strftime("%H:%M")
+        print(f"An error occurred at {time_str}: {e}")
 
     is_fetching_data = False
+
+def draw_multi_colored_text(surface, data, surface_width, start_y, right_offset):
+    # --- STEP 1: Calculate the Total Width ---
+    total_width = 0
+    
+    # We create a list of rendered surfaces and calculate the total width
+    rendered_parts = []
+    
+    for text_part, color in data:
+        # Render the text part (we need to do this to get the exact width)
+        text_surface = FONT_LARGE.render(text_part, True, color)
+        
+        # Store the surface and its width
+        rendered_parts.append((text_surface, text_surface.get_width()))
+        
+        # Accumulate the width
+        total_width += text_surface.get_width()
+        
+    # --- STEP 2: Determine the Starting X-Coordinate ---
+    # The starting X is the screen's right edge, minus the total text width, 
+    # minus the desired offset.
+    start_x = surface_width - total_width - right_offset
+    
+    # --- STEP 3: Draw the Text ---
+    x_offset = start_x
+    
+    for text_surface, width in rendered_parts:
+        # Blit (draw) the surface onto the screen
+        surface.blit(text_surface, (x_offset, start_y))
+        
+        # Increment the x_offset by the width of the text we just drew
+        x_offset += width
 
 fetch_transit_data() 
 last_data_refresh_time = time.time()
@@ -154,30 +198,47 @@ while running:
             # 2. Calculate the center Y-coordinate for all elements in this row
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
 
-            if arrival.get('predicted', False):
-                now = round(datetime.now(TIME_ZONE).timestamp())
-                time_until = (arrival['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
-                time_diff = (arrival['predicted_arrival_time']/1000 - arrival['scheduled_arrival_time']/1000)
-                if time_diff >= 60:
-                    text_color = YELLOW
-                elif time_diff <= -60:
-                    text_color = GREEN
-            else:
-                # Calculate minutes until arrival in real-time
-                time_until = (arrival['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
+            colored_arr: list[tuple[str, tuple]] = []
+            num_schedules = len(arrival[1]) # Get the correct count
 
-            minutes_until = int(time_until / 60) # truncate to minute
-            if minutes_until > 60:
-                minutes_str = datetime.fromtimestamp(arrival["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
-            elif minutes_until < 1:
-                minutes_str = "Arriving"
-            else:
-                minutes_str = f"{minutes_until} min"
+            for j, schedule in enumerate(arrival[1]): # Use enumerate to get the index j
+                # ... (Existing logic for time_until and text_color remains the same)
+
+                if schedule.get('predicted', False):
+                    now = round(datetime.now(TIME_ZONE).timestamp())
+                    time_until = (schedule['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
+                    time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
+                    if time_diff >= 60:
+                        text_color = YELLOW
+                    elif time_diff <= -60:
+                        text_color = GREEN
+                else:
+                    # Calculate minutes until arrival in real-time
+                    time_until = (schedule['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
+
+                minutes_until = int(time_until / 60) # truncate to minute
+                if minutes_until > 60:
+                    minutes_str = datetime.fromtimestamp(schedule["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
+                elif minutes_until < 1:
+                    minutes_str = "Now"
+                else:
+                    minutes_str = f"{minutes_until}"
+                
+                # 1. Append the minutes string
+                colored_arr.append((minutes_str, text_color))
+
+                # 2. Append a comma and space if it's NOT the last schedule
+                if j < num_schedules - 1:
+                    colored_arr.append((", ", WHITE))
+                
+            # 3. Append the final " min" suffix ONLY ONCE at the end of all times
+            if num_schedules > 0 and colored_arr[-1][0] != "Now":
+                colored_arr.append((" min", WHITE))
 
             # --- B. Prepare Text Surfaces and Circle ---
         
             # 1. Route Number Circle
-            route_number = str(arrival['route']) # Ensure it's a string
+            route_number = str(arrival[0][0]) # Ensure it's a string
             
             # Blit the circle
             if "1 Line" in route_number:
@@ -206,7 +267,7 @@ while running:
             screen.blit(route_num_surface, route_num_rect)
 
             # 2. Headsign Text
-            headsign_text = arrival['headsign']
+            headsign_text = arrival[0][1]
             headsign_x_pos = X_ROUTE + ROUTE_CIRCLE_RADIUS + 10 # 10 pixels gap after the circle
             headsign_surface = FONT_LARGE.render(headsign_text, True, WHITE) # Use WHITE for headsign
             screen.blit(
@@ -215,12 +276,7 @@ while running:
             )
 
             # 3. Minutes until Arrival Text
-            minutes_text_surface = FONT_LARGE.render(minutes_str, True, text_color)
-            minutes_x_pos = SCREEN_WIDTH - minutes_text_surface.get_width() - 10
-            screen.blit(
-                minutes_text_surface, 
-                (minutes_x_pos, ROW_CENTER_Y - TEXT_CENTER_OFFSET)
-            )
+            draw_multi_colored_text(screen, colored_arr, SCREEN_WIDTH, ROW_CENTER_Y - TEXT_CENTER_OFFSET, 10)
 
             # Optional: Add a line separator (e.g., a thin rectangle)
             # pygame.draw.line(screen, WHITE, (0, row_y + line_spacing - 5), (SCREEN_WIDTH, row_y + line_spacing - 5), 1)
