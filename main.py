@@ -44,6 +44,8 @@ WHITE = (255, 255, 255)
 BLACK = (23, 29, 34)
 YELLOW = (255, 255, 0)
 GREEN = (0, 255, 100)
+RED = (255, 0, 0)
+LIGHT_GREY = (128, 128, 128)
 LINE_1_COLOR = (41,130,64)
 LINE_2_COLOR = (0,162,224)
 BUS_COLOR = (255,116,65)
@@ -208,16 +210,20 @@ while running:
                 # ... (Existing logic for time_until and text_color remains the same)
 
                 if schedule.get('predicted', False):
+                    # Calculate minutes until arrival in real-time
                     now = round(datetime.now(TIME_ZONE).timestamp())
                     time_until = (schedule['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
                     time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
+                    if time_diff > 300:
+                        text_color = RED
                     if time_diff >= 60:
                         text_color = YELLOW
                     elif time_diff <= -60:
                         text_color = GREEN
                 else:
-                    # Calculate minutes until arrival in real-time
+                    # Calculate minutes until arrival from scheduled time
                     time_until = (schedule['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
+                    text_color = LIGHT_GREY
 
                 minutes_until = int(time_until / 60) # truncate to minute
                 if minutes_until > 60:
