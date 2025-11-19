@@ -215,7 +215,7 @@ while running:
                     now = round(datetime.now(TIME_ZONE).timestamp())
                     time_until = (schedule['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
                     time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
-                    if time_diff > 300:
+                    if time_diff >= 300:
                         text_color = RED
                     elif time_diff >= 60:
                         text_color = YELLOW
