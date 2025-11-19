@@ -20,7 +20,7 @@ BASE_URL = 'https://api.pugetsound.onebusaway.org/'
 LINK_STOP_ID_ANGLE_LAKE = "40_99610" # Cap Hill Station to Angle Lake
 LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
-STREETCAR_STOP_ID = "11175" # Broadway And Denny
+STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
 time_zone = pytz.timezone(REGION)
 
@@ -74,7 +74,7 @@ client = OnebusawaySDK(**{
     "base_url" : BASE_URL
     })
 
-def parse_query(stop) -> dict[tuple[str, str], list[dict]]:
+def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
     response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
     arrivals_and_departures = response.data.entry.arrivals_and_departures
     if len(arrivals_and_departures) == 0:
@@ -83,6 +83,9 @@ def parse_query(stop) -> dict[tuple[str, str], list[dict]]:
         arrivals_and_departures = response.data.entry.arrivals_and_departures[:1]
     arr = defaultdict(list)
     for arr_dep in arrivals_and_departures:
+        if filter != None:
+            if arr_dep.trip_headsign != filter:
+                continue
         arr[(
             arr_dep.route_short_name,
             arr_dep.trip_headsign
@@ -107,7 +110,7 @@ def fetch_transit_data():
         response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE)
         response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD)
         response_bus = parse_query(BUS_STOP_ID)
-        # response_streetcar = parse_query(STREETCAR_STOP_ID)
+        response_streetcar = parse_query(STREETCAR_STOP_ID, "Pioneer Square")
 
         merged_responses = []
 
@@ -117,8 +120,8 @@ def fetch_transit_data():
             merged_responses.append((headsign, response_link_angle_lake[headsign]))
         for headsign in response_bus:
             merged_responses.append((headsign, response_bus[headsign]))
-        # for headsign in response_streetcar:
-        #     merged_responses.append((headsign, response_streetcar[headsign]))
+        for headsign in response_streetcar:
+            merged_responses.append((headsign, response_streetcar[headsign]))
         global_arrival_data = merged_responses
 
     except Exception as e:
