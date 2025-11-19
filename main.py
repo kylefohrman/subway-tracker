@@ -7,6 +7,7 @@ from datetime import datetime
 import pytz
 from clock_display import ClockDisplay
 from collections import defaultdict
+from math import floor
 
 config = dotenv_values(".env")
 
@@ -225,7 +226,7 @@ while running:
                     time_until = (schedule['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
                     text_color = LIGHT_GREY
 
-                minutes_until = int(time_until / 60) # truncate to minute
+                minutes_until = floor(time_until / 60) # truncate to minute
                 if minutes_until > 60:
                     minutes_str = datetime.fromtimestamp(schedule["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
                 elif minutes_until < 1:
