@@ -217,7 +217,7 @@ while running:
                     time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
                     if time_diff > 300:
                         text_color = RED
-                    if time_diff >= 60:
+                    elif time_diff >= 60:
                         text_color = YELLOW
                     elif time_diff <= -60:
                         text_color = GREEN
