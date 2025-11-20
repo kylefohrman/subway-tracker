@@ -8,6 +8,8 @@ import pytz
 from clock_display import ClockDisplay
 from collections import defaultdict
 from math import floor
+import requests
+import json
 
 config = dotenv_values(".env")
 
@@ -23,11 +25,18 @@ LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
+SERVICE_ALERTS_REFRESH_RATE = 10 # Fetch service alerts every minute
 time_zone = pytz.timezone(REGION)
 
 global_arrival_data: list[tuple[tuple[str, str], list[dict]]] = [] 
 last_data_refresh_time = 0
 is_fetching_data = False
+
+global_alerts_data: list[str] = []
+is_fetching_alerts = False
+alert_index = 0
+alert_thresholds = ["SEVERE"]
+ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
 
 # Initialize Pygame modules
 pygame.init()
@@ -43,20 +52,24 @@ pygame.display.set_caption("Upcoming Arrivals")
 # Colors and Fonts
 WHITE = (255, 255, 255)
 BLACK = (23, 29, 34)
-YELLOW = (255, 255, 0)
+YELLOW = (255, 179, 34)
 GREEN = (0, 255, 100)
 RED = (255, 0, 0)
 LIGHT_GREY = (128, 128, 128)
-LINE_1_COLOR = (41,130,64)
-LINE_2_COLOR = (0,162,224)
-BUS_COLOR = (255,116,65)
-STREETCAR_COLOR = (157,28,34)
+ALERT_GREY = (67, 65, 66)
+LINE_1_COLOR = (41, 130, 64)
+LINE_2_COLOR = (0, 162, 224)
+BUS_COLOR = (255, 116, 65)
+STREETCAR_COLOR = (157, 28, 34)
 
 FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
 CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
 FONT_LARGE = pygame.font.Font(FONT_PATH, 60)
 FONT_SMALL = pygame.font.Font(FONT_PATH, 42)
+FONT_ALERT = pygame.font.Font(FONT_PATH, 24)
 BAR_HEIGHT = 50
+
+ICON_SIZE = 150
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
@@ -72,10 +85,85 @@ clock_display = ClockDisplay(
     station_name = STATION_NAME
 )
 
+try:
+    WARNING_ICON = pygame.image.load('icons/alert-octagon.png')
+    # Scale the icon to fit nicely in the alert bar
+    WARNING_ICON = pygame.transform.scale(WARNING_ICON, (ICON_SIZE, ICON_SIZE))
+except pygame.error as e:
+    print(f"Could not load warning icon: {e}")
+    WARNING_ICON = None # Handle case where icon loading fails
+
 client = OnebusawaySDK(**{
     "api_key" : API_KEY,
     "base_url" : BASE_URL
     })
+
+def wrap_text(text, font, max_width):
+    """Wraps text to fit within a maximum pixel width."""
+    lines = []
+    words = text.split(' ')
+    current_line = []
+    for word in words:
+        # Check the width if the new word is added
+        if font.size(' '.join(current_line + [word]))[0] <= max_width:
+            current_line.append(word)
+        else:
+            # Start a new line
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    lines.append(' '.join(current_line)) # Add the last line
+    return lines
+
+def draw_alert_box(surface, alert_text):
+    global global_alerts_data
+    """
+    Draws a light grey alert box near the bottom of the screen with a warning icon
+    and wrapped text.
+    """
+    if not alert_text:
+        return
+    
+    if len(global_alerts_data) > 1:
+        alert_text = "(" + str(alert_index + 1) + "/" + str(len(global_alerts_data)) + ") " + alert_text
+
+    ALERT_HEIGHT = ICON_SIZE # Increased height to accommodate wrapped text
+    BOTTOM_OFFSET = 20
+    SIDE_PADDING = 20
+    ICON_PADDING = 20
+    TEXT_START_X_OFFSET = ICON_PADDING + ICON_SIZE + 10
+
+    alert_rect = pygame.Rect(
+        0, 
+        surface.get_height() - ALERT_HEIGHT - BOTTOM_OFFSET, 
+        surface.get_width(), 
+        ALERT_HEIGHT
+    )
+
+    # Draw the light grey background
+    pygame.draw.rect(surface, ALERT_GREY, alert_rect)
+
+    # --- Draw Icon ---
+    if WARNING_ICON:
+        icon_rect = WARNING_ICON.get_rect(midleft=(alert_rect.x, alert_rect.centery))
+        surface.blit(WARNING_ICON, icon_rect)
+    
+    # --- Draw Wrapped Text ---
+    # Calculate the maximum width available for the text
+    max_text_width = alert_rect.width - TEXT_START_X_OFFSET - SIDE_PADDING
+    
+    # Wrap the text using the helper function
+    wrapped_lines = wrap_text(alert_text, FONT_ALERT, max_text_width) # Use FONT_SMALL for better wrapping
+
+    # Determine vertical starting position for centered multi-line text
+    # Start drawing lines at a Y position so the whole block is vertically centered
+    total_text_height = len(wrapped_lines) * FONT_ALERT.get_linesize()
+    current_y = alert_rect.centery - (total_text_height // 2)
+
+    for line in wrapped_lines:
+        text_surface = FONT_ALERT.render(line, True, YELLOW)
+        # Position each line starting just after the icon area, aligned left
+        surface.blit(text_surface, (alert_rect.x + TEXT_START_X_OFFSET, current_y))
+        current_y += FONT_ALERT.get_linesize() # Move down for the next line
 
 def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
     response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
@@ -174,8 +262,45 @@ def draw_multi_colored_text(surface, data, surface_width, start_y, right_offset)
         # Increment the x_offset by the width of the text we just drew
         x_offset += width
 
+def fetch_service_alerts():
+    global global_alerts_data, is_fetching_alerts, alert_index, alert_thresholds
+    is_fetching_alerts = True
+    global_alerts_data = []
+
+    try:
+        # Make the GET request to the URL
+        response = requests.get(ALERTS_URL)
+
+        # Check if the request was successful (status code 200-299)
+        response.raise_for_status()
+
+        # Parse the data, checking only for SEVERE alerts
+        data = response.json()
+        for entity in data["entity"]:
+            if entity["alert"]["severity_level"] not in alert_thresholds:
+                continue
+            for translation in entity["alert"]["header_text"]["translation"]:
+                if translation["language"] == "en":
+                    global_alerts_data.append(translation["text"])
+                    break
+
+    except requests.exceptions.RequestException as e:
+        # Handle any potential errors during the request (e.g., network issues, invalid URL)
+        print(f"An error occurred: {e}")
+    except json.JSONDecodeError:
+        # Handle cases where the response body does not contain valid JSON
+        print("Failed to decode JSON from the response.")
+
+    if alert_index >= len(global_alerts_data) - 1:
+        alert_index = 0
+    else:
+        alert_index += 1
+    is_fetching_alerts = False
+
 fetch_transit_data() 
+fetch_service_alerts()
 last_data_refresh_time = time.time()
+last_alert_refresh_time = time.time()
 
 running = True
 while running:
@@ -190,6 +315,10 @@ while running:
         # Start the API call in a new thread so the main loop doesn't freeze
         threading.Thread(target=fetch_transit_data, daemon=True).start()
         last_data_refresh_time = current_time
+
+    if current_time - last_alert_refresh_time > SERVICE_ALERTS_REFRESH_RATE and not is_fetching_alerts:
+        threading.Thread(target=fetch_service_alerts, daemon=True).start()
+        last_alert_refresh_time = current_time
 
     # 3. Drawing/Rendering (High Frequency)
     screen.fill(BLACK) 
@@ -305,6 +434,9 @@ while running:
         # Display a loading/error message if the list is empty
         loading_text = FONT_LARGE.render("Loading Data...", True, WHITE)
         screen.blit(loading_text, (SCREEN_WIDTH/2 - loading_text.get_width()/2, SCREEN_HEIGHT/2))
+
+    if global_alerts_data:
+        draw_alert_box(screen, global_alerts_data[alert_index])
 
     pygame.display.flip()
     clock.tick(FPS)
