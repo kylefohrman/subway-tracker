@@ -25,7 +25,7 @@ LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
 DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
-SERVICE_ALERTS_REFRESH_RATE = 10 # Fetch service alerts every minute
+SERVICE_ALERTS_REFRESH_RATE = 60 # Fetch service alerts every minute
 time_zone = pytz.timezone(REGION)
 
 global_arrival_data: list[tuple[tuple[str, str], list[dict]]] = [] 
@@ -368,6 +368,7 @@ while running:
                 minutes_until = floor(time_until / 60) # truncate to minute
                 if minutes_until > 60:
                     minutes_str = datetime.fromtimestamp(schedule["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
+                    text_color = WHITE
                 elif minutes_until < 1:
                     minutes_str = "Now"
                 else:
@@ -380,8 +381,8 @@ while running:
                 if j < num_schedules - 1:
                     colored_arr.append((", ", WHITE))
                 
-            # 3. Append the final " min" suffix ONLY ONCE at the end of all times
-            if num_schedules > 0 and colored_arr[-1][0] != "Now":
+            # 3. Append the final " min" suffix ONLY ONCE at the end of all times, if not end of service
+            if num_schedules > 0 and colored_arr[-1][0] != "Now" and ":" not in colored_arr[-1][0]:
                 colored_arr.append((" min", WHITE))
 
             # --- B. Prepare Text Surfaces and Circle ---
