@@ -3,13 +3,14 @@ import time
 import threading
 from dotenv import dotenv_values
 from onebusaway import OnebusawaySDK
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from clock_display import ClockDisplay
 from collections import defaultdict
 from math import floor
 import requests
 import json
+from enum import Enum
 
 config = dotenv_values(".env")
 
@@ -37,6 +38,8 @@ is_fetching_alerts = False
 alert_index = 0
 alert_thresholds = ["SEVERE"]
 ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
+
+night_mode: dict[str, int] = {}
 
 # Initialize Pygame modules
 pygame.init()
@@ -165,13 +168,21 @@ def draw_alert_box(surface, alert_text):
         surface.blit(text_surface, (alert_rect.x + TEXT_START_X_OFFSET, current_y))
         current_y += FONT_ALERT.get_linesize() # Move down for the next line
 
-def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
-    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
+def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], list[dict]]:
+    global night_mode
+    transit_mode = str(transit_mode_enum)
+    if transit_mode in night_mode.keys():
+        if night_mode[transit_mode] < datetime.now().timestamp():
+            del night_mode[transit_mode]
+            search_window = 35
+        else:
+            search_window = 420
+    else:
+        search_window = 35
+    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=search_window, minutes_before=0)
     arrivals_and_departures = response.data.entry.arrivals_and_departures
-    if len(arrivals_and_departures) == 0:
-        time.sleep(3)
-        response = client.arrival_and_departure.list(stop_id=stop, minutes_after=300, minutes_before=0)
-        arrivals_and_departures = response.data.entry.arrivals_and_departures[:1]
+    if transit_mode in night_mode.keys():
+        arrivals_and_departures = arrivals_and_departures[:1]
     arr = defaultdict(list)
     for arr_dep in arrivals_and_departures:
         if filter != None:
@@ -200,6 +211,12 @@ def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
         })
     return dict(arr)
 
+class TransitMode(Enum):
+    ANGLE = "ANGLE_LAKE"
+    LYNNWOOD = "LYNNWOOD"
+    BUS = "BUS"
+    STREETCAR = "STREETCAR"
+
 def fetch_transit_data():
     """Fetches data from OBA and updates the global data structure."""
     global global_arrival_data, is_fetching_data
@@ -207,10 +224,19 @@ def fetch_transit_data():
 
     try:
         # Without any optional parameters, uses the API default time window
-        response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE)
-        response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD)
-        response_bus = parse_query(BUS_STOP_ID)
+        buffer_time = int((datetime.now() + timedelta(minutes=30)).timestamp())
+        response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE, TransitMode.ANGLE)
+        if len(response_link_angle_lake) == 0:
+            night_mode[str(TransitMode.ANGLE)] = buffer_time
+        response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD, TransitMode.LYNNWOOD)
+        if len(response_link_lynnwood) == 0:
+            night_mode[str(TransitMode.LYNNWOOD)] = buffer_time
+        response_bus = parse_query(BUS_STOP_ID, TransitMode.BUS)
+        if len(response_bus) == 0:
+            night_mode[str(TransitMode.BUS)] = buffer_time
         response_streetcar = parse_query(STREETCAR_STOP_ID, "Pioneer Square")
+        if len(response_streetcar) == 0:
+            night_mode[str(TransitMode.STREETCAR)] = buffer_time
 
         merged_responses = []
 
