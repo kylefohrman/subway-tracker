@@ -81,7 +81,7 @@ def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
     response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
     arrivals_and_departures = response.data.entry.arrivals_and_departures
     if len(arrivals_and_departures) == 0:
-        time.sleep(2)
+        time.sleep(3)
         response = client.arrival_and_departure.list(stop_id=stop, minutes_after=300, minutes_before=0)
         arrivals_and_departures = response.data.entry.arrivals_and_departures[:1]
     arr = defaultdict(list)
@@ -89,9 +89,18 @@ def parse_query(stop, filter=None) -> dict[tuple[str, str], list[dict]]:
         if filter != None:
             if arr_dep.trip_headsign != filter:
                 continue
+        headsign = arr_dep.trip_headsign
+        headsign_len = len(headsign)
+        # If headsign is too long, first try to eliminate extra words. If that is not enough, truncate it 
+        if headsign_len > 18:
+            headsign_words = headsign.split(" ")
+            headsign = headsign_words[0] + " " + headsign_words[1]
+            if len(headsign) > 18:
+                headsign = headsign[:13]
+            headsign += "..."
         arr[(
             arr_dep.route_short_name,
-            arr_dep.trip_headsign
+            headsign
         )].append({
             "predicted_arrival_time": arr_dep.predicted_arrival_time,
             "predicted_departure_time": arr_dep.predicted_departure_time,
@@ -205,9 +214,10 @@ while running:
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
 
             colored_arr: list[tuple[str, tuple]] = []
-            num_schedules = len(arrival[1]) # Get the correct count
+            arrival_times = arrival[1][:4]
+            num_schedules = len(arrival_times) # Get the correct count
 
-            for j, schedule in enumerate(arrival[1]): # Use enumerate to get the index j
+            for j, schedule in enumerate(arrival_times): # Use enumerate to get the index j
                 # ... (Existing logic for time_until and text_color remains the same)
 
                 if schedule.get('predicted', False):
