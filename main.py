@@ -322,6 +322,12 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Button 1 is Left-click, Button 2 is Middle-click (scroll wheel), 
+            # Button 3 is Right-click
+            # We need this when running on Pi without a keyboard
+            if event.button == 3: 
+                running = False
 
     # 2. Data Update (Low Frequency, using THREADING)
     current_time = time.time()
