@@ -1,19 +1,21 @@
-import pygame
-import time
-import threading
-from dotenv import dotenv_values
-from onebusaway import OnebusawaySDK
-from datetime import datetime, timedelta
-import pytz
 from clock_display import ClockDisplay
 from collections import defaultdict
-from math import floor
-import requests
+from datetime import datetime, timedelta
+from display_functions import wrap_text, draw_multi_colored_text
+from dotenv import dotenv_values
 import json
-from enum import Enum
+from math import floor
+from onebusaway import OnebusawaySDK
+import pygame
+import pytz
+import requests
+import threading
+import time
+from transit_mode import TransitMode
 
 config = dotenv_values(".env")
 
+# Configuration variables
 API_KEY = config["API_KEY"]
 REGION = config["REGION"]
 if REGION is None:
@@ -21,24 +23,27 @@ if REGION is None:
 STATION_NAME = config["STATION_NAME"]
 TIME_ZONE = pytz.timezone(REGION)
 BASE_URL = 'https://api.pugetsound.onebusaway.org/'
+time_zone = pytz.timezone(REGION)
+
+# Stop IDs
 LINK_STOP_ID_ANGLE_LAKE = "40_99610" # Cap Hill Station to Angle Lake
 LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
-DATA_REFRESH_RATE = 35 # Fetch data every 35 seconds
-SERVICE_ALERTS_REFRESH_RATE = 60 # Fetch service alerts every minute
-time_zone = pytz.timezone(REGION)
 
+# Global variables
 global_arrival_data: list[tuple[tuple[str, str], list[dict]]] = [] 
 last_data_refresh_time = 0
 is_fetching_data = False
 
 global_alerts_data: list[str] = []
+last_alert_refresh_time = 0
 is_fetching_alerts = False
 alert_index = 0
 alert_thresholds = ["SEVERE"]
 ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
 
+# Caching for night mode
 night_mode: dict[str, int] = {}
 night_cache: dict = {}
 
@@ -47,7 +52,8 @@ pygame.init()
 pygame.font.init() # Initialize the font module
 
 # Display Setup
-# Replace with the size of your Raspberry Pi screen/monitor
+DATA_REFRESH_RATE = 35 # Fetch data every 35 seconds
+SERVICE_ALERTS_REFRESH_RATE = 60 # Fetch service alerts every minute
 info = pygame.display.Info()
 SCREEN_WIDTH = info.current_w
 SCREEN_HEIGHT = info.current_h
@@ -57,29 +63,31 @@ pygame.display.set_caption("Upcoming Arrivals")
 # Colors and Fonts
 WHITE = (255, 255, 255)
 BLACK = (23, 29, 34)
+LIGHT_GREY = (128, 128, 128)
+ALERT_GREY = (67, 65, 66)
 ALERT_YELLOW = (255, 179, 34)
 LIGHT_YELLOW = (255, 255, 0)
 GREEN = (0, 255, 100)
 RED = (255, 0, 0)
-LIGHT_GREY = (128, 128, 128)
-ALERT_GREY = (67, 65, 66)
 LINE_1_COLOR = (41, 130, 64)
 LINE_2_COLOR = (0, 162, 224)
 BUS_COLOR = (255, 116, 65)
 STREETCAR_COLOR = (157, 28, 34)
 
+# Fonts
 FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
 CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
-FONT_LARGE = pygame.font.Font(FONT_PATH, 84)
+FONT_LARGE = pygame.font.Font(FONT_PATH, 72)
 FONT_SMALL = pygame.font.Font(FONT_PATH, 48)
 FONT_ALERT = pygame.font.Font(FONT_PATH, 32)
+
+# Component settings
 BAR_HEIGHT = 60
-
 ICON_SIZE = 200
-
-
+ROUTE_CIRCLE_RADIUS = 45 # Increase this size for prominence
 SCREEN_WIDTH = screen.get_width()
 SCREEN_HEIGHT = screen.get_height()
+
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
 FPS = 30
@@ -107,22 +115,6 @@ client = OnebusawaySDK(**{
     "base_url" : BASE_URL
     })
 
-def wrap_text(text, font, max_width):
-    """Wraps text to fit within a maximum pixel width."""
-    lines = []
-    words = text.split(' ')
-    current_line = []
-    for word in words:
-        # Check the width if the new word is added
-        if font.size(' '.join(current_line + [word]))[0] <= max_width:
-            current_line.append(word)
-        else:
-            # Start a new line
-            lines.append(' '.join(current_line))
-            current_line = [word]
-    lines.append(' '.join(current_line)) # Add the last line
-    return lines
-
 def draw_alert_box(surface, alert_text):
     global global_alerts_data
     """
@@ -135,7 +127,7 @@ def draw_alert_box(surface, alert_text):
     if len(global_alerts_data) > 1:
         alert_text = "(" + str(alert_index + 1) + "/" + str(len(global_alerts_data)) + ") " + alert_text
 
-    ALERT_HEIGHT = ICON_SIZE # Increased height to accommodate wrapped text
+    alert_height = ICON_SIZE # Increased height to accommodate wrapped text
     BOTTOM_OFFSET = 20
     SIDE_PADDING = 20
     ICON_PADDING = 20
@@ -143,9 +135,9 @@ def draw_alert_box(surface, alert_text):
 
     alert_rect = pygame.Rect(
         0, 
-        surface.get_height() - ALERT_HEIGHT - BOTTOM_OFFSET, 
+        surface.get_height() - alert_height - BOTTOM_OFFSET, 
         surface.get_width(), 
-        ALERT_HEIGHT
+        alert_height
     )
 
     # Draw the light grey background
@@ -231,12 +223,6 @@ def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], l
         })
     return dict(arr)
 
-class TransitMode(Enum):
-    ANGLE = "ANGLE_LAKE"
-    LYNNWOOD = "LYNNWOOD"
-    BUS = "BUS"
-    STREETCAR = "STREETCAR"
-
 def fetch_transit_data():
     """Fetches data from OBA and updates the global data structure."""
     global global_arrival_data, is_fetching_data
@@ -276,38 +262,6 @@ def fetch_transit_data():
 
     is_fetching_data = False
 
-def draw_multi_colored_text(surface, data, surface_width, start_y, right_offset):
-    # --- STEP 1: Calculate the Total Width ---
-    total_width = 0
-    
-    # We create a list of rendered surfaces and calculate the total width
-    rendered_parts = []
-    
-    for text_part, color in data:
-        # Render the text part (we need to do this to get the exact width)
-        text_surface = FONT_LARGE.render(text_part, True, color)
-        
-        # Store the surface and its width
-        rendered_parts.append((text_surface, text_surface.get_width()))
-        
-        # Accumulate the width
-        total_width += text_surface.get_width()
-        
-    # --- STEP 2: Determine the Starting X-Coordinate ---
-    # The starting X is the screen's right edge, minus the total text width, 
-    # minus the desired offset.
-    start_x = surface_width - total_width - right_offset
-    
-    # --- STEP 3: Draw the Text ---
-    x_offset = start_x
-    
-    for text_surface, width in rendered_parts:
-        # Blit (draw) the surface onto the screen
-        surface.blit(text_surface, (x_offset, start_y))
-        
-        # Increment the x_offset by the width of the text we just drew
-        x_offset += width
-
 def fetch_service_alerts():
     global global_alerts_data, is_fetching_alerts, alert_index, alert_thresholds
     is_fetching_alerts = True
@@ -344,6 +298,8 @@ def fetch_service_alerts():
     global_alerts_data = alerts_data
     is_fetching_alerts = False
 
+# --- Main Script Execution ---
+# Load initial values
 fetch_transit_data() 
 fetch_service_alerts()
 last_data_refresh_time = time.time()
@@ -378,66 +334,64 @@ while running:
     # Assuming FONT_LARGE is the largest element, calculate its height once
     FONT_HEIGHT = FONT_LARGE.get_height() 
     TEXT_CENTER_OFFSET = FONT_HEIGHT // 2
-    ROUTE_CIRCLE_RADIUS = 45 # Increase this size for prominence (e.g., from 15 to 25)
-    ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + 20 # Total height for the row area
-    X_ROUTE = ROUTE_CIRCLE_RADIUS + 20 # X position for the circle center
+    ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + (ROUTE_CIRCLE_RADIUS*.5) # Total height for the row area
+    X_ROUTE = ROUTE_CIRCLE_RADIUS + (ROUTE_CIRCLE_RADIUS*.5) # X position for the circle center
 
     if global_arrival_data:
         # Loop through the GLOBAL data list updated by the thread
         for i, arrival in enumerate(global_arrival_data):
             text_color = WHITE
-            # 1. Define the top edge of the current row block
+            # Define the top edge of the current row block
             ROW_TOP_Y = y_offset + (i * ROW_SPACING)
 
-            # 2. Calculate the center Y-coordinate for all elements in this row
+            # Calculate the center Y-coordinate for all elements in this row
             ROW_CENTER_Y = ROW_TOP_Y + (ROW_SPACING // 2)
 
             colored_arr: list[tuple[str, tuple]] = []
             arrival_times = arrival[1][:4]
             num_schedules = len(arrival_times) # Get the correct count
 
-            for j, schedule in enumerate(arrival_times): # Use enumerate to get the index j
-                # ... (Existing logic for time_until and text_color remains the same)
-
+            for j, schedule in enumerate(arrival_times):
                 if schedule.get('predicted', False):
                     # Calculate minutes until arrival in real-time
+                    # Color the text based on (predicted time vs scheduled time)
                     now = round(datetime.now(TIME_ZONE).timestamp())
                     time_until = (schedule['predicted_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
                     time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
-                    if time_diff >= 300:
+                    if time_diff >= 300: # >=5min late
                         text_color = RED
-                    elif time_diff >= 90:
+                    elif time_diff >= 90: # >=1.5min late
                         text_color = LIGHT_YELLOW
-                    elif time_diff <= -60:
+                    elif time_diff <= -60: # >1min early
                         text_color = GREEN
                 else:
-                    # Calculate minutes until arrival from scheduled time
+                    # If real-time data is not available for this arrival, set the color to light grey
                     time_until = (schedule['scheduled_arrival_time']/1000 - round(datetime.now(TIME_ZONE).timestamp()))
                     text_color = LIGHT_GREY
 
                 minutes_until = floor(time_until / 60) # truncate to minute
                 if minutes_until > 60:
+                    # If the next arrival isn't for over an hour (such as during night mode), display the actual time instead of minutes_until
                     minutes_str = datetime.fromtimestamp(schedule["scheduled_arrival_time"]/1000, TIME_ZONE).strftime("%H:%M")
                     text_color = WHITE
                 elif minutes_until < 1:
+                    # Display "Now" if arrival is imminent
                     minutes_str = "Now"
                 else:
                     minutes_str = f"{minutes_until}"
                 
-                # 1. Append the minutes string
+                # Append the minutes string
                 colored_arr.append((minutes_str, text_color))
 
-                # 2. Append a comma and space if it's NOT the last schedule
+                # Append a comma and space if it's NOT the last schedule
                 if j < num_schedules - 1:
                     colored_arr.append((", ", WHITE))
                 
-            # 3. Append the final " min" suffix ONLY ONCE at the end of all times, if not end of service
+            # Append the final " min" suffix ONLY ONCE at the end of all times, if not end of service
             if num_schedules > 0 and colored_arr[-1][0] != "Now" and ":" not in colored_arr[-1][0]:
                 colored_arr.append((" min", WHITE))
-
-            # --- B. Prepare Text Surfaces and Circle ---
         
-            # 1. Route Number Circle
+            # Route Number Circle
             route_number = str(arrival[0][0]) # Ensure it's a string
             
             # Blit the circle
@@ -466,7 +420,7 @@ while running:
             route_num_rect = route_num_surface.get_rect(center=(X_ROUTE, ROW_CENTER_Y))
             screen.blit(route_num_surface, route_num_rect)
 
-            # 2. Headsign Text
+            # Headsign Text
             headsign_text = arrival[0][1]
             headsign_x_pos = X_ROUTE + (ROUTE_CIRCLE_RADIUS*1.5) # add a gap after the circle
             headsign_surface = FONT_LARGE.render(headsign_text, True, WHITE) # Use WHITE for headsign
@@ -475,8 +429,8 @@ while running:
                 (headsign_x_pos, ROW_CENTER_Y - TEXT_CENTER_OFFSET) # Subtract half height
             )
 
-            # 3. Minutes until Arrival Text
-            draw_multi_colored_text(screen, colored_arr, SCREEN_WIDTH, ROW_CENTER_Y - TEXT_CENTER_OFFSET, 10)
+            # Minutes_until_arrival Text
+            draw_multi_colored_text(screen, colored_arr, SCREEN_WIDTH, ROW_CENTER_Y - TEXT_CENTER_OFFSET, 20, FONT_LARGE)
 
             # Optional: Add a line separator (e.g., a thin rectangle)
             # pygame.draw.line(screen, WHITE, (0, row_y + line_spacing - 5), (SCREEN_WIDTH, row_y + line_spacing - 5), 1)
