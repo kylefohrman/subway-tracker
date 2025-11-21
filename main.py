@@ -307,8 +307,8 @@ def draw_multi_colored_text(surface, data, surface_width, start_y, right_offset)
 def fetch_service_alerts():
     global global_alerts_data, is_fetching_alerts, alert_index, alert_thresholds
     is_fetching_alerts = True
-    global_alerts_data = []
 
+    alerts_data = []
     try:
         # Make the GET request to the URL
         response = requests.get(ALERTS_URL)
@@ -323,7 +323,7 @@ def fetch_service_alerts():
                 continue
             for translation in entity["alert"]["header_text"]["translation"]:
                 if translation["language"] == "en":
-                    global_alerts_data.append(translation["text"])
+                    alerts_data.append(translation["text"])
                     break
 
     except requests.exceptions.RequestException as e:
@@ -333,10 +333,11 @@ def fetch_service_alerts():
         # Handle cases where the response body does not contain valid JSON
         print("Failed to decode JSON from the response.")
 
-    if alert_index >= len(global_alerts_data) - 1:
+    if alert_index >= len(alerts_data) - 1:
         alert_index = 0
     else:
         alert_index += 1
+    global_alerts_data = alerts_data
     is_fetching_alerts = False
 
 fetch_transit_data() 
