@@ -1,7 +1,8 @@
-from clock_display import ClockDisplay
 from collections import defaultdict
+from components.clock_display import ClockDisplay
+from components.display_functions import wrap_text, draw_multi_colored_text
+from components.transit_mode import TransitMode
 from datetime import datetime, timedelta
-from display_functions import wrap_text, draw_multi_colored_text
 from dotenv import dotenv_values
 import json
 from math import floor
@@ -11,7 +12,6 @@ import pytz
 import requests
 import threading
 import time
-from transit_mode import TransitMode
 
 config = dotenv_values(".env")
 
@@ -75,8 +75,8 @@ BUS_COLOR = (255, 116, 65)
 STREETCAR_COLOR = (157, 28, 34)
 
 # Fonts
-FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
-CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
+FONT_PATH = 'assets/fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
+CLOCK_FONT = 'assets/fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
 FONT_LARGE = pygame.font.Font(FONT_PATH, 72)
 FONT_SMALL = pygame.font.Font(FONT_PATH, 48)
 FONT_ALERT = pygame.font.Font(FONT_PATH, 32)
@@ -103,7 +103,7 @@ clock_display = ClockDisplay(
 )
 
 try:
-    WARNING_ICON = pygame.image.load('icons/alert-octagon.png')
+    WARNING_ICON = pygame.image.load('assets/icons/alert-octagon.png')
     # Scale the icon to fit nicely in the alert bar
     WARNING_ICON = pygame.transform.scale(WARNING_ICON, (ICON_SIZE, ICON_SIZE))
 except pygame.error as e:
@@ -169,32 +169,40 @@ def draw_alert_box(surface, alert_text):
 def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], list[dict]]:
     global night_mode
     transit_mode = str(transit_mode_enum)
-    # If the stop is in night mode, don't bother calling the API. Just return the cached value.
+    
+    arrivals_and_departures = [] # Initialize as empty list
+
+    # If the stop is in night mode...
     if transit_mode in night_mode.keys():
-        # If we are near expiration time of the cache, clear the cache. Exit night mode and start querying again as normal
         if night_mode[transit_mode] < datetime.now().timestamp():
+            # Exit night mode: clear cache and query normally
             del night_mode[transit_mode]
             del night_cache[transit_mode]
             response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
             arrivals_and_departures = response.data.entry.arrivals_and_departures
         else:
-            # If nothing is in the cache, make a one-time query for the next 6 hours
             if transit_mode not in night_cache.keys():
+                # One-time query for night mode (next 7 hours)
                 response = client.arrival_and_departure.list(stop_id=stop, minutes_after=420, minutes_before=0)
-                arrivals_and_departures = response.data.entry.arrivals_and_departures
-                arr = arrivals_and_departures[:1][0]
-                night_cache[transit_mode] = arr
-                # Set night mode to end 20 minutes before the first arrival
-                night_mode[transit_mode] = round(arr.scheduled_arrival_time/1000 - (60*20))
+                all_departures = response.data.entry.arrivals_and_departures
+                if all_departures:
+                    arr = all_departures[0]
+                    night_cache[transit_mode] = arr
+                    # Set night mode to end 20 minutes before the first arrival
+                    night_mode[transit_mode] = round(arr.scheduled_arrival_time / 1000 - (60 * 20))
+                    # The departures list will contain only this one future arrival
+                    arrivals_and_departures = [arr] # Wrap the single object in a list
+                else:
+                    # If no departures found even for 7 hours
+                    arrivals_and_departures = []
             else:
-                # Otherwise, pull from the existing cache
-                arrivals_and_departures = night_cache[transit_mode]
+                # Pull from the existing cache
+                arrivals_and_departures = [night_cache[transit_mode]]
     else:
         # If the stop is not in night mode, query for the next 35 minutes
         response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
         arrivals_and_departures = response.data.entry.arrivals_and_departures
-    if transit_mode in night_mode.keys():
-        arrivals_and_departures = arrivals_and_departures[:1]
+
     arr = defaultdict(list)
     for arr_dep in arrivals_and_departures:
         if filter != None:
