@@ -74,19 +74,22 @@ LINE_2_COLOR = (0, 162, 224)
 BUS_COLOR = (255, 116, 65)
 STREETCAR_COLOR = (157, 28, 34)
 
-# Fonts
-FONT_PATH = 'assets/fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
-CLOCK_FONT = 'assets/fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
-FONT_LARGE = pygame.font.Font(FONT_PATH, 72)
-FONT_SMALL = pygame.font.Font(FONT_PATH, 48)
-FONT_ALERT = pygame.font.Font(FONT_PATH, 32)
-
 # Component settings
 BAR_HEIGHT = 60
 ICON_SIZE = 200
 ROUTE_CIRCLE_RADIUS = 45 # Increase this size for prominence
 SCREEN_WIDTH = screen.get_width()
 SCREEN_HEIGHT = screen.get_height()
+
+# Fonts
+FONT_PATH = 'assets/fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
+CLOCK_FONT = 'assets/fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
+large_font_size = 72
+if SCREEN_WIDTH > 1800:
+    large_font_size = 84
+FONT_LARGE = pygame.font.Font(FONT_PATH, large_font_size)
+FONT_SMALL = pygame.font.Font(FONT_PATH, 48)
+FONT_ALERT = pygame.font.Font(FONT_PATH, 32)
 
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
