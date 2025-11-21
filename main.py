@@ -48,9 +48,10 @@ pygame.font.init() # Initialize the font module
 
 # Display Setup
 # Replace with the size of your Raspberry Pi screen/monitor
-SCREEN_WIDTH = 1024
-SCREEN_HEIGHT = 800
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+info = pygame.display.Info()
+SCREEN_WIDTH = info.current_w
+SCREEN_HEIGHT = info.current_h
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
 pygame.display.set_caption("Upcoming Arrivals")
 
 # Colors and Fonts
@@ -69,13 +70,16 @@ STREETCAR_COLOR = (157, 28, 34)
 
 FONT_PATH = 'fonts/Roboto/static/Roboto_Condensed-Bold.ttf'
 CLOCK_FONT = 'fonts/Roboto/static/Roboto_Condensed-ExtraLight.ttf'
-FONT_LARGE = pygame.font.Font(FONT_PATH, 60)
-FONT_SMALL = pygame.font.Font(FONT_PATH, 42)
-FONT_ALERT = pygame.font.Font(FONT_PATH, 24)
-BAR_HEIGHT = 50
+FONT_LARGE = pygame.font.Font(FONT_PATH, 84)
+FONT_SMALL = pygame.font.Font(FONT_PATH, 48)
+FONT_ALERT = pygame.font.Font(FONT_PATH, 32)
+BAR_HEIGHT = 60
 
-ICON_SIZE = 150
+ICON_SIZE = 200
 
+
+SCREEN_WIDTH = screen.get_width()
+SCREEN_HEIGHT = screen.get_height()
 # Timing Variables
 clock = pygame.time.Clock() # Used to limit FPS
 FPS = 30
@@ -207,7 +211,7 @@ def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], l
         headsign = arr_dep.trip_headsign
         headsign_len = len(headsign)
         # If headsign is too long, first try to eliminate extra words. If that is not enough, truncate it 
-        if headsign_len > 18:
+        if headsign_len > 18 and SCREEN_WIDTH < 1500:
             headsign_words = headsign.split(" ")
             headsign = headsign_words[0] + " " + headsign_words[1]
             if len(headsign) > 18:
@@ -351,6 +355,9 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
 
     # 2. Data Update (Low Frequency, using THREADING)
     current_time = time.time()
@@ -371,9 +378,9 @@ while running:
     # Assuming FONT_LARGE is the largest element, calculate its height once
     FONT_HEIGHT = FONT_LARGE.get_height() 
     TEXT_CENTER_OFFSET = FONT_HEIGHT // 2
-    ROUTE_CIRCLE_RADIUS = 35 # Increase this size for prominence (e.g., from 15 to 25)
-    ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + 10 # Total height for the row area
-    X_ROUTE = ROUTE_CIRCLE_RADIUS + 10 # X position for the circle center
+    ROUTE_CIRCLE_RADIUS = 45 # Increase this size for prominence (e.g., from 15 to 25)
+    ROW_SPACING = 2*ROUTE_CIRCLE_RADIUS + 20 # Total height for the row area
+    X_ROUTE = ROUTE_CIRCLE_RADIUS + 20 # X position for the circle center
 
     if global_arrival_data:
         # Loop through the GLOBAL data list updated by the thread
@@ -461,7 +468,7 @@ while running:
 
             # 2. Headsign Text
             headsign_text = arrival[0][1]
-            headsign_x_pos = X_ROUTE + ROUTE_CIRCLE_RADIUS + 10 # 10 pixels gap after the circle
+            headsign_x_pos = X_ROUTE + (ROUTE_CIRCLE_RADIUS*1.5) # add a gap after the circle
             headsign_surface = FONT_LARGE.render(headsign_text, True, WHITE) # Use WHITE for headsign
             screen.blit(
                 headsign_surface, 

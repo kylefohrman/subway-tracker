@@ -15,7 +15,7 @@ class ClockDisplay:
     SHADOW_COLOR = (10, 13, 15) # Black
     TEXT_COLOR = (255, 255, 255) # White
     SHADOW_OFFSET = 3
-    PADDING = 10
+    PADDING = 25
     
     def __init__(self, screen, screen_width, screen_height, font_path, time_zone_str, bar_height, station_name):
         self.screen = screen
