@@ -25,7 +25,7 @@ LINK_STOP_ID_ANGLE_LAKE = "40_99610" # Cap Hill Station to Angle Lake
 LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
 BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
 STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
-DATA_REFRESH_RATE = 30 # Fetch data every 30 seconds
+DATA_REFRESH_RATE = 35 # Fetch data every 35 seconds
 SERVICE_ALERTS_REFRESH_RATE = 60 # Fetch service alerts every minute
 time_zone = pytz.timezone(REGION)
 
@@ -40,6 +40,7 @@ alert_thresholds = ["SEVERE"]
 ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
 
 night_mode: dict[str, int] = {}
+night_cache: dict = {}
 
 # Initialize Pygame modules
 pygame.init()
@@ -55,7 +56,8 @@ pygame.display.set_caption("Upcoming Arrivals")
 # Colors and Fonts
 WHITE = (255, 255, 255)
 BLACK = (23, 29, 34)
-YELLOW = (255, 179, 34)
+ALERT_YELLOW = (255, 179, 34)
+LIGHT_YELLOW = (255, 255, 0)
 GREEN = (0, 255, 100)
 RED = (255, 0, 0)
 LIGHT_GREY = (128, 128, 128)
@@ -163,7 +165,7 @@ def draw_alert_box(surface, alert_text):
     current_y = alert_rect.centery - (total_text_height // 2)
 
     for line in wrapped_lines:
-        text_surface = FONT_ALERT.render(line, True, YELLOW)
+        text_surface = FONT_ALERT.render(line, True, ALERT_YELLOW)
         # Position each line starting just after the icon area, aligned left
         surface.blit(text_surface, (alert_rect.x + TEXT_START_X_OFFSET, current_y))
         current_y += FONT_ALERT.get_linesize() # Move down for the next line
@@ -171,16 +173,30 @@ def draw_alert_box(surface, alert_text):
 def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], list[dict]]:
     global night_mode
     transit_mode = str(transit_mode_enum)
+    # If the stop is in night mode, don't bother calling the API. Just return the cached value.
     if transit_mode in night_mode.keys():
+        # If we are near expiration time of the cache, clear the cache. Exit night mode and start querying again as normal
         if night_mode[transit_mode] < datetime.now().timestamp():
             del night_mode[transit_mode]
-            search_window = 35
+            del night_cache[transit_mode]
+            response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
+            arrivals_and_departures = response.data.entry.arrivals_and_departures
         else:
-            search_window = 420
+            # If nothing is in the cache, make a one-time query for the next 6 hours
+            if transit_mode not in night_cache.keys():
+                response = client.arrival_and_departure.list(stop_id=stop, minutes_after=420, minutes_before=0)
+                arrivals_and_departures = response.data.entry.arrivals_and_departures
+                arr = arrivals_and_departures[:1][0]
+                night_cache[transit_mode] = arr
+                # Set night mode to end 20 minutes before the first arrival
+                night_mode[transit_mode] = round(arr.scheduled_arrival_time/1000 - (60*20))
+            else:
+                # Otherwise, pull from the existing cache
+                arrivals_and_departures = night_cache[transit_mode]
     else:
-        search_window = 35
-    response = client.arrival_and_departure.list(stop_id=stop, minutes_after=search_window, minutes_before=0)
-    arrivals_and_departures = response.data.entry.arrivals_and_departures
+        # If the stop is not in night mode, query for the next 35 minutes
+        response = client.arrival_and_departure.list(stop_id=stop, minutes_after=35, minutes_before=0)
+        arrivals_and_departures = response.data.entry.arrivals_and_departures
     if transit_mode in night_mode.keys():
         arrivals_and_departures = arrivals_and_departures[:1]
     arr = defaultdict(list)
@@ -234,7 +250,7 @@ def fetch_transit_data():
         response_bus = parse_query(BUS_STOP_ID, TransitMode.BUS)
         if len(response_bus) == 0:
             night_mode[str(TransitMode.BUS)] = buffer_time
-        response_streetcar = parse_query(STREETCAR_STOP_ID, "Pioneer Square")
+        response_streetcar = parse_query(STREETCAR_STOP_ID, TransitMode.STREETCAR, "Pioneer Square")
         if len(response_streetcar) == 0:
             night_mode[str(TransitMode.STREETCAR)] = buffer_time
 
@@ -382,8 +398,8 @@ while running:
                     time_diff = (schedule['predicted_arrival_time']/1000 - schedule['scheduled_arrival_time']/1000)
                     if time_diff >= 300:
                         text_color = RED
-                    elif time_diff >= 60:
-                        text_color = YELLOW
+                    elif time_diff >= 90:
+                        text_color = LIGHT_YELLOW
                     elif time_diff <= -60:
                         text_color = GREEN
                 else:

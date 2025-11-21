@@ -24,6 +24,6 @@ Afterwards, just run `main.py`
 Times are displayed with the following color codes:
 - White :white_large_square: means the vehicle is *on time*
 - Green :green_square: means the vehicle is *early*
-- Yellow :yellow_square: means the vehicle is *late (1-5 minutes)*
+- Yellow :yellow_square: means the vehicle is *late (~2-5 minutes)*
 - Red :red_square: means the vehicle is *very late (>5 minutes)*
 - Grey 🔘 means that real-time tracking is temporarily unavailable for this vehicle
