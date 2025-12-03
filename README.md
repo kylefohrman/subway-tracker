@@ -27,3 +27,8 @@ Times are displayed with the following color codes:
 - Yellow :yellow_square: means the vehicle is *late (~2-5 minutes)*
 - Red :red_square: means the vehicle is *very late (>5 minutes)*
 - Grey 🔘 means that real-time tracking is temporarily unavailable for this vehicle
+
+## Controls
+There are two ways to exit the program, for setups with and without a keyboard:
+- `Escape`
+- `Right Click`
