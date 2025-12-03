@@ -49,7 +49,7 @@ night_cache: dict = {}
 
 # Initialize Pygame modules
 pygame.init()
-pygame.font.init() # Initialize the font module
+pygame.font.init()
 
 # Display Setup
 DATA_REFRESH_RATE = 35 # Fetch data every 35 seconds
@@ -130,7 +130,7 @@ def draw_alert_box(surface, alert_text):
     if len(global_alerts_data) > 1:
         alert_text = "(" + str(alert_index + 1) + "/" + str(len(global_alerts_data)) + ") " + alert_text
 
-    alert_height = ICON_SIZE # Increased height to accommodate wrapped text
+    alert_height = ICON_SIZE
     BOTTOM_OFFSET = 20
     SIDE_PADDING = 20
     ICON_PADDING = 20
@@ -156,7 +156,7 @@ def draw_alert_box(surface, alert_text):
     max_text_width = alert_rect.width - TEXT_START_X_OFFSET - SIDE_PADDING
     
     # Wrap the text using the helper function
-    wrapped_lines = wrap_text(alert_text, FONT_ALERT, max_text_width) # Use FONT_SMALL for better wrapping
+    wrapped_lines = wrap_text(alert_text, FONT_ALERT, max_text_width)
 
     # Determine vertical starting position for centered multi-line text
     # Start drawing lines at a Y position so the whole block is vertically centered
@@ -379,7 +379,7 @@ while running:
                         text_color = RED
                     elif time_diff >= 90: # >=1.5min late
                         text_color = LIGHT_YELLOW
-                    elif time_diff <= -60: # >1min early
+                    elif time_diff <= -60: # >=1min early
                         text_color = GREEN
                 else:
                     # If real-time data is not available for this arrival, set the color to light grey
@@ -448,9 +448,6 @@ while running:
 
             # Minutes_until_arrival Text
             draw_multi_colored_text(screen, colored_arr, SCREEN_WIDTH, ROW_CENTER_Y - TEXT_CENTER_OFFSET, 20, FONT_LARGE)
-
-            # Optional: Add a line separator (e.g., a thin rectangle)
-            # pygame.draw.line(screen, WHITE, (0, row_y + line_spacing - 5), (SCREEN_WIDTH, row_y + line_spacing - 5), 1)
 
     else:
         # Display a loading/error message if the list is empty
