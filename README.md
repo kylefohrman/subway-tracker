@@ -19,7 +19,7 @@ STATION_NAME="Kylehaus Station" # Custom station name that will appear onscreen
 
 Afterwards, just run `main.py`
 
-<img width="1278" height="701" alt="merged_with_streetcar" src="https://github.com/user-attachments/assets/b184fe88-d582-4c9e-9273-ddd4ac329815" />
+<img width="1278" height="701" alt="transit board screengrab" src="https://github.com/user-attachments/assets/b184fe88-d582-4c9e-9273-ddd4ac329815" />
 
 Times are displayed with the following color codes:
 - White :white_large_square: means the vehicle is *on time*
@@ -27,6 +27,9 @@ Times are displayed with the following color codes:
 - Yellow :yellow_square: means the vehicle is *late (~2-5 minutes)*
 - Red :red_square: means the vehicle is *very late (>5 minutes)*
 - Grey 🔘 means that real-time tracking is temporarily unavailable for this vehicle
+
+<img width="504" height="378" alt="transit board live demo" src="https://github.com/user-attachments/assets/25b11788-04d7-40c5-ae00-21d7e12a564e" /><br>
+*Your transit-friendly lifestyle awaits!*
 
 ## Controls
 There are two ways to exit the program, for setups with and without a keyboard:
