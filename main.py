@@ -331,6 +331,15 @@ while running:
             # We need this when running on Pi without a keyboard
             if event.button == 3: 
                 running = False
+            elif event.button == 1:
+                if screen.get_flags() & pygame.FULLSCREEN:
+                    SCREEN_HEIGHT -= 50
+                    SCREEN_WIDTH -= 50
+                    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+                else:
+                    SCREEN_HEIGHT += 50
+                    SCREEN_WIDTH += 50
+                    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
 
     # 2. Data Update (Low Frequency, using THREADING)
     current_time = time.time()

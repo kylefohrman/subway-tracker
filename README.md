@@ -32,3 +32,5 @@ Times are displayed with the following color codes:
 There are two ways to exit the program, for setups with and without a keyboard:
 - `Escape`
 - `Right Click`
+
+On the other hand, `Left Click` toggles fullscreen
