@@ -170,7 +170,7 @@ def draw_alert_box(surface, alert_text):
         surface.blit(text_surface, (alert_rect.x + TEXT_START_X_OFFSET, current_y))
         current_y += FONT_ALERT.get_linesize() # Move down for the next line
 
-def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], list[dict]]:
+def parse_query(stop, transit_mode_enum, filter=None, exclude=None) -> dict[tuple[str, str], list[dict]]:
     global night_mode
     transit_mode = str(transit_mode_enum)
     
@@ -190,7 +190,11 @@ def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], l
                 response = client.arrival_and_departure.list(stop_id=stop, minutes_after=420, minutes_before=0)
                 all_departures = response.data.entry.arrivals_and_departures
                 if all_departures:
-                    arr = all_departures[0]
+                    if filter != None:
+                        arr = [x for x in all_departures if (x.route_short_name in filter) or (x.trip_headsign in filter)]
+                    else:
+                        arr = all_departures
+                    arr = arr[0]
                     night_cache[transit_mode] = arr
                     # Set night mode to end 20 minutes before the first arrival
                     night_mode[transit_mode] = round(arr.scheduled_arrival_time / 1000 - (60 * 20))
@@ -209,13 +213,13 @@ def parse_query(stop, transit_mode_enum, filter=None) -> dict[tuple[str, str], l
 
     arr = defaultdict(list)
     for arr_dep in arrivals_and_departures:
-        if filter != None:
-            if arr_dep.trip_headsign != filter:
+        if filter != None and len(filter) > 0:
+            if arr_dep.trip_headsign not in filter and arr_dep.route_short_name not in filter:
                 continue
         headsign = arr_dep.trip_headsign
         headsign_len = len(headsign)
         # If headsign is too long, first try to eliminate extra words. If that is not enough, truncate it 
-        if headsign_len > 18 and SCREEN_WIDTH < 1500:
+        if (headsign_len > 18 and SCREEN_WIDTH < 1500) or headsign_len > 25:
             headsign_words = headsign.split(" ")
             headsign = headsign_words[0] + " " + headsign_words[1]
             if len(headsign) > 18:
@@ -249,10 +253,13 @@ def fetch_transit_data():
         response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD, TransitMode.LYNNWOOD)
         if len(response_link_lynnwood) == 0:
             night_mode[str(TransitMode.LYNNWOOD)] = buffer_time
-        response_bus = parse_query(BUS_OLIVE_STOP_ID, TransitMode.BUS)
-        if len(response_bus) == 0:
-            night_mode[str(TransitMode.BUS)] = buffer_time
-        response_streetcar = parse_query(STREETCAR_STOP_ID, TransitMode.STREETCAR, "Pioneer Square")
+        response_bus_olive = parse_query(BUS_OLIVE_STOP_ID, TransitMode.BUS_OLIVE)
+        if len(response_bus_olive) == 0:
+            night_mode[str(TransitMode.BUS_OLIVE)] = buffer_time
+        response_bus_broadway = parse_query(BUS_BROADWAY_STOP_ID, TransitMode.BUS_BROADWAY, ["9", "43", "60"])
+        if len(response_bus_broadway) == 0:
+            night_mode[str(TransitMode.BUS_BROADWAY)] = buffer_time
+        response_streetcar = parse_query(STREETCAR_STOP_ID, TransitMode.STREETCAR, ["Pioneer Square"])
         if len(response_streetcar) == 0:
             night_mode[str(TransitMode.STREETCAR)] = buffer_time
 
@@ -262,8 +269,10 @@ def fetch_transit_data():
             merged_responses.append((headsign, response_link_lynnwood[headsign]))
         for headsign in response_link_angle_lake:
             merged_responses.append((headsign, response_link_angle_lake[headsign]))
-        for headsign in response_bus:
-            merged_responses.append((headsign, response_bus[headsign]))
+        for headsign in response_bus_olive:
+            merged_responses.append((headsign, response_bus_olive[headsign]))
+        for headsign in response_bus_broadway:
+            merged_responses.append((headsign, response_bus_broadway[headsign]))
         for headsign in response_streetcar:
             merged_responses.append((headsign, response_streetcar[headsign]))
         global_arrival_data = merged_responses
@@ -424,24 +433,18 @@ while running:
             # Blit the circle
             if "1 Line" in route_number:
                 route_number = "1"
-                line_color = LINE_1_COLOR
+                circle_color = LINE_1_COLOR
             elif "2 Line" in route_number:
                 route_number = "2"
-                line_color = LINE_2_COLOR
-            elif "8" in route_number:
-                route_number = "8"
-                line_color = BUS_COLOR
-            elif "11" in route_number:
-                route_number = "11"
-                line_color = BUS_COLOR
+                circle_color = LINE_2_COLOR
             elif "Streetcar" in route_number:
                 route_number = 'S'
-                line_color = STREETCAR_COLOR
+                circle_color = STREETCAR_COLOR
             else:
-                line_color = BLACK
+                circle_color = BUS_COLOR
             # Render the route number for placement inside the circle
             route_num_surface = FONT_LARGE.render(route_number, True, WHITE) # Use a smaller font for the number
-            pygame.draw.circle(screen, line_color, (X_ROUTE, ROW_CENTER_Y), ROUTE_CIRCLE_RADIUS)
+            pygame.draw.circle(screen, circle_color, (X_ROUTE, ROW_CENTER_Y), ROUTE_CIRCLE_RADIUS)
 
             # Center the route number text on the circle
             route_num_rect = route_num_surface.get_rect(center=(X_ROUTE, ROW_CENTER_Y))
