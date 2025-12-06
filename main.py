@@ -28,8 +28,9 @@ time_zone = pytz.timezone(REGION)
 # Stop IDs
 LINK_STOP_ID_ANGLE_LAKE = "40_99610" # Cap Hill Station to Angle Lake
 LINK_STOP_ID_LYNNWOOD = "40_99603" # Cap Hill Station to Lynnwood
-BUS_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
-STREETCAR_STOP_ID = "1_11175" # Broadway And Denny
+BUS_OLIVE_STOP_ID = "1_29266" # E Olive Way & Summit Ave E
+BUS_BROADWAY_STOP_ID = "1_11060" # Broadway and E Denny
+STREETCAR_STOP_ID = "1_11175" # Broadway and E Howell
 
 # Global variables
 global_arrival_data: list[tuple[tuple[str, str], list[dict]]] = [] 
@@ -248,7 +249,7 @@ def fetch_transit_data():
         response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD, TransitMode.LYNNWOOD)
         if len(response_link_lynnwood) == 0:
             night_mode[str(TransitMode.LYNNWOOD)] = buffer_time
-        response_bus = parse_query(BUS_STOP_ID, TransitMode.BUS)
+        response_bus = parse_query(BUS_OLIVE_STOP_ID, TransitMode.BUS)
         if len(response_bus) == 0:
             night_mode[str(TransitMode.BUS)] = buffer_time
         response_streetcar = parse_query(STREETCAR_STOP_ID, TransitMode.STREETCAR, "Pioneer Square")

@@ -2,6 +2,7 @@
 venv/
 __pycache__/*
 components/__pycache__/*
+*.pyc
 *test.py
 *.service
 start_subway.sh
