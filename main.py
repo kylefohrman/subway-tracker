@@ -251,18 +251,27 @@ def fetch_transit_data():
         response_link_angle_lake = parse_query(LINK_STOP_ID_ANGLE_LAKE, TransitMode.ANGLE)
         if len(response_link_angle_lake) == 0:
             night_mode[str(TransitMode.ANGLE)] = buffer_time
+        time.sleep(1)
+
         response_link_lynnwood = parse_query(LINK_STOP_ID_LYNNWOOD, TransitMode.LYNNWOOD)
         if len(response_link_lynnwood) == 0:
             night_mode[str(TransitMode.LYNNWOOD)] = buffer_time
+        time.sleep(1)
+
         response_bus_olive = parse_query(BUS_OLIVE_STOP_ID, TransitMode.BUS_OLIVE)
         if len(response_bus_olive) == 0:
             night_mode[str(TransitMode.BUS_OLIVE)] = buffer_time
+        time.sleep(1)
+
         response_bus_broadway = parse_query(BUS_BROADWAY_STOP_ID, TransitMode.BUS_BROADWAY, ["9", "43", "60"])
         if len(response_bus_broadway) == 0:
             night_mode[str(TransitMode.BUS_BROADWAY)] = buffer_time
+        time.sleep(1)
+
         response_streetcar = parse_query(STREETCAR_STOP_ID, TransitMode.STREETCAR, ["Pioneer Square"])
         if len(response_streetcar) == 0:
             night_mode[str(TransitMode.STREETCAR)] = buffer_time
+        time.sleep(1)
 
         merged_responses = []
 
