@@ -279,7 +279,7 @@ def fetch_transit_data():
 
     except Exception as e:
         time_str = datetime.now(TIME_ZONE).strftime("%H:%M")
-        print(f"An error occurred at {time_str}: {e}")
+        print(f"An error occurred at {time_str} while fetching transit data: {e}")
 
     is_fetching_data = False
 
@@ -307,7 +307,7 @@ def fetch_service_alerts():
 
     except requests.exceptions.RequestException as e:
         # Handle any potential errors during the request (e.g., network issues, invalid URL)
-        print(f"An error occurred: {e}")
+        print(f"An error occurred while fetching service alerts: {e}")
     except json.JSONDecodeError:
         # Handle cases where the response body does not contain valid JSON
         print("Failed to decode JSON from the response.")
