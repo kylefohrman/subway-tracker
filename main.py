@@ -53,7 +53,7 @@ pygame.init()
 pygame.font.init()
 
 # Display Setup
-DATA_REFRESH_RATE = 35 # Fetch data every 35 seconds
+DATA_REFRESH_RATE = 41 # Fetch data every 41 seconds
 SERVICE_ALERTS_REFRESH_RATE = 60 # Fetch service alerts every minute
 info = pygame.display.Info()
 SCREEN_WIDTH = info.current_w
