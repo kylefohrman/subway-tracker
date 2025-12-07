@@ -306,7 +306,6 @@ def fetch_service_alerts():
             for period in entity["alert"]["active_period"]:
                 # Allow for 24hr notice
                 DAY = 60*60*24
-                print(time.time() - DAY)
                 if period["start"] < (time.time() + DAY) and period["end"] > time.time():
                     alert_active = True
             if not alert_active:
