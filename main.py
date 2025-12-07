@@ -40,6 +40,7 @@ is_fetching_data = False
 global_alerts_data: list[str] = []
 last_alert_refresh_time = 0
 is_fetching_alerts = False
+alerts_lock = threading.Lock()
 alert_index = 0
 alert_thresholds = ["SEVERE"]
 ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
@@ -284,7 +285,7 @@ def fetch_transit_data():
     is_fetching_data = False
 
 def fetch_service_alerts():
-    global global_alerts_data, is_fetching_alerts, alert_index, alert_thresholds
+    global global_alerts_data, is_fetching_alerts, alert_index, alert_thresholds, alerts_lock
     is_fetching_alerts = True
 
     alerts_data = []
@@ -312,11 +313,16 @@ def fetch_service_alerts():
         # Handle cases where the response body does not contain valid JSON
         print("Failed to decode JSON from the response.")
 
-    if alert_index >= len(alerts_data) - 1:
-        alert_index = 0
-    else:
-        alert_index += 1
-    global_alerts_data = alerts_data
+    with alerts_lock:
+        if alerts_data: # Only update index if there are new alerts
+            # Recalculate index based on the *new* data size
+            if alert_index >= len(alerts_data):
+                alert_index = 0
+            # Otherwise, only increment if the index is valid for the new data
+            elif alert_index < len(alerts_data) - 1:
+                 alert_index += 1
+
+        global_alerts_data = alerts_data
     is_fetching_alerts = False
 
 # --- Main Script Execution ---
@@ -468,7 +474,10 @@ while running:
         screen.blit(loading_text, (SCREEN_WIDTH/2 - loading_text.get_width()/2, SCREEN_HEIGHT/2))
 
     if global_alerts_data:
-        draw_alert_box(screen, global_alerts_data[alert_index])
+        with alerts_lock:
+            # Check again under the lock, in case the list was cleared or changed
+            if global_alerts_data:
+                draw_alert_box(screen, global_alerts_data[alert_index])
 
     pygame.display.flip()
     clock.tick(FPS)
