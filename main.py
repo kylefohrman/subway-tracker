@@ -195,12 +195,15 @@ def parse_query(stop, transit_mode_enum, filter=None, exclude=None) -> dict[tupl
                         arr = [x for x in all_departures if (x.route_short_name in filter) or (x.trip_headsign in filter)]
                     else:
                         arr = all_departures
-                    arr = arr[0]
-                    night_cache[transit_mode] = arr
-                    # Set night mode to end 20 minutes before the first arrival
-                    night_mode[transit_mode] = round(arr.scheduled_arrival_time / 1000 - (60 * 20))
-                    # The departures list will contain only this one future arrival
-                    arrivals_and_departures = [arr] # Wrap the single object in a list
+                    if arr:
+                        arr = arr[0]
+                        night_cache[transit_mode] = arr
+                        # Set night mode to end 20 minutes before the first arrival
+                        night_mode[transit_mode] = round(arr.scheduled_arrival_time / 1000 - (60 * 20))
+                        # The departures list will contain only this one future arrival
+                        arrivals_and_departures = [arr] # Wrap the single object in a list
+                    else:
+                        arrivals_and_departures = []
                 else:
                     # If no departures found even for 7 hours
                     arrivals_and_departures = []
