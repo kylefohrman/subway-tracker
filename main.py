@@ -342,7 +342,7 @@ def fetch_service_alerts():
     with alerts_lock:
         if alerts_data: # Only update index if there are new alerts
             # Recalculate index based on the *new* data size
-            if alert_index >= len(alerts_data):
+            if alert_index >= len(alerts_data) - 1:
                 alert_index = 0
             # Otherwise, only increment if the index is valid for the new data
             elif alert_index < len(alerts_data) - 1:
