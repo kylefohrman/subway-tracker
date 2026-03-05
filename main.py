@@ -49,6 +49,18 @@ ALERTS_URL = "https://s3.amazonaws.com/st-service-alerts-prod/alerts_pb.json"
 night_mode: dict[str, int] = {}
 night_cache: dict = {}
 
+# Alert display configuration (ticker + periodic full display)
+ALERT_TICKER_HEIGHT = 48
+ALERT_FULL_DISPLAY_SECONDS = 12
+ALERT_CYCLE_SECONDS = 90
+ALERT_TICKER_CHAR_PADDING = 4
+ALERT_TICKER_TRIM_SUFFIX = "..."
+
+# Runtime alert state
+alert_show_full_until = 0
+last_alert_cycle = 0
+ticker_x = 0
+
 # Initialize Pygame modules
 pygame.init()
 pygame.font.init()
@@ -170,6 +182,50 @@ def draw_alert_box(surface, alert_text):
         # Position each line starting just after the icon area, aligned left
         surface.blit(text_surface, (alert_rect.x + TEXT_START_X_OFFSET, current_y))
         current_y += FONT_ALERT.get_linesize() # Move down for the next line
+
+def draw_alert_ticker(surface, alert_text):
+    """Draw a compact single-line ticker flush to the bottom (no interaction)."""
+    if not alert_text:
+        return
+
+    # Add index prefix if multiple alerts
+    if len(global_alerts_data) > 1:
+        alert_text = "(" + str(alert_index + 1) + "/" + str(len(global_alerts_data)) + ") " + alert_text
+
+    SIDE_PADDING = 12
+
+    # Put the ticker flush to the bottom (no extra bottom offset)
+    ticker_rect = pygame.Rect(
+        0,
+        surface.get_height() - ALERT_TICKER_HEIGHT,
+        surface.get_width(),
+        ALERT_TICKER_HEIGHT,
+    )
+
+    pygame.draw.rect(surface, ALERT_GREY, ticker_rect)
+
+    # Icon: aligned with left edge of screen, height == banner height
+    icon_h = ALERT_TICKER_HEIGHT
+    if WARNING_ICON:
+        small_icon = pygame.transform.scale(WARNING_ICON, (icon_h, icon_h))
+        icon_rect = small_icon.get_rect(topleft=(ticker_rect.x, ticker_rect.y))
+        surface.blit(small_icon, icon_rect)
+        text_start_x = icon_rect.right + 10
+    else:
+        text_start_x = ticker_rect.x + 8
+
+    max_text_width = ticker_rect.width - (text_start_x - ticker_rect.x) - SIDE_PADDING
+
+    # Trim text to fit single line if necessary
+    text = alert_text
+    text_surf = FONT_ALERT.render(text, True, ALERT_YELLOW)
+    if text_surf.get_width() > max_text_width:
+        while text and FONT_ALERT.render(text + ALERT_TICKER_TRIM_SUFFIX, True, ALERT_YELLOW).get_width() > max_text_width:
+            text = text[:-1]
+        text += ALERT_TICKER_TRIM_SUFFIX
+        text_surf = FONT_ALERT.render(text, True, ALERT_YELLOW)
+
+    surface.blit(text_surf, (text_start_x, ticker_rect.centery - FONT_ALERT.get_linesize() // 2))
 
 def parse_query(stop, transit_mode_enum, filter=None, exclude=None) -> dict[tuple[str, str], list[dict]]:
     global night_mode
@@ -501,9 +557,19 @@ while running:
 
     if global_alerts_data:
         with alerts_lock:
-            # Check again under the lock, in case the list was cleared or changed
             if global_alerts_data:
-                draw_alert_box(screen, global_alerts_data[alert_index])
+                current_time_loop = time.time()
+                # Start a periodic full-alert display cycle
+                if current_time_loop - last_alert_cycle > ALERT_CYCLE_SECONDS:
+                    alert_show_full_until = current_time_loop + ALERT_FULL_DISPLAY_SECONDS
+                    last_alert_cycle = current_time_loop
+
+                if current_time_loop < alert_show_full_until:
+                    # Show the full alert box briefly
+                    draw_alert_box(screen, global_alerts_data[alert_index])
+                else:
+                    # Show compact, non-blocking ticker
+                    draw_alert_ticker(screen, global_alerts_data[alert_index])
 
     pygame.display.flip()
     clock.tick(FPS)
