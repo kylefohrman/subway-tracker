@@ -61,6 +61,14 @@ alert_show_full_until = 0
 last_alert_cycle = 0
 ticker_x = 0
 
+# Animation / transition state for alerts
+ALERT_TRANSITION_DURATION = 0.8  # seconds for expand/collapse animation
+alert_state = "ticker"  # one of: 'ticker', 'animating', 'full'
+alert_transition_start = 0
+alert_transition_direction = None  # 'expand' or 'collapse'
+alert_full_end_time = 0
+
+
 # Initialize Pygame modules
 pygame.init()
 pygame.font.init()
@@ -226,6 +234,56 @@ def draw_alert_ticker(surface, alert_text):
         text_surf = FONT_ALERT.render(text, True, ALERT_YELLOW)
 
     surface.blit(text_surf, (text_start_x, ticker_rect.centery - FONT_ALERT.get_linesize() // 2))
+
+def _lerp(a, b, t):
+    return a + (b - a) * t
+
+def draw_alert_overlay(surface, alert_text, bar_height, icon_size, text_alpha=255):
+    """Unified alert renderer that draws a bar of `bar_height`, an icon scaled to
+    `icon_size`, and wrapped text rendered with `text_alpha` transparency.
+    """
+    if not alert_text:
+        return
+
+    SIDE_PADDING = 12
+
+    ticker_rect = pygame.Rect(
+        0,
+        surface.get_height() - int(bar_height),
+        surface.get_width(),
+        int(bar_height),
+    )
+
+    pygame.draw.rect(surface, ALERT_GREY, ticker_rect)
+
+    # Icon: align to left of the bar and vertically centered
+    icon_h = int(icon_size)
+    text_start_x = ticker_rect.x + SIDE_PADDING
+    if WARNING_ICON:
+        # Scale icon preserving alpha
+        try:
+            small_icon = pygame.transform.smoothscale(WARNING_ICON, (icon_h, icon_h))
+        except Exception:
+            small_icon = pygame.transform.scale(WARNING_ICON, (icon_h, icon_h))
+        icon_rect = small_icon.get_rect(midleft=(ticker_rect.x + SIDE_PADDING, ticker_rect.centery))
+        surface.blit(small_icon, icon_rect)
+        text_start_x = icon_rect.right + 10
+
+    max_text_width = ticker_rect.width - (text_start_x - ticker_rect.x) - SIDE_PADDING
+
+    # Trim/wrap like the ticker/box logic
+    wrapped_lines = wrap_text(alert_text, FONT_ALERT, max_text_width)
+
+    # Render wrapped lines with provided alpha
+    total_text_height = len(wrapped_lines) * FONT_ALERT.get_linesize()
+    current_y = ticker_rect.centery - (total_text_height // 2)
+
+    for line in wrapped_lines:
+        text_surface = FONT_ALERT.render(line, True, ALERT_YELLOW).convert_alpha()
+        # Apply alpha
+        text_surface.set_alpha(int(text_alpha))
+        surface.blit(text_surface, (text_start_x, current_y))
+        current_y += FONT_ALERT.get_linesize()
 
 def parse_query(stop, transit_mode_enum, filter=None, exclude=None) -> dict[tuple[str, str], list[dict]]:
     global night_mode
@@ -559,17 +617,57 @@ while running:
         with alerts_lock:
             if global_alerts_data:
                 current_time_loop = time.time()
-                # Start a periodic full-alert display cycle
-                if current_time_loop - last_alert_cycle > ALERT_CYCLE_SECONDS:
-                    alert_show_full_until = current_time_loop + ALERT_FULL_DISPLAY_SECONDS
+
+                # Trigger a full alert cycle periodically (starts expand animation)
+                if current_time_loop - last_alert_cycle > ALERT_CYCLE_SECONDS and alert_state == 'ticker':
+                    alert_transition_direction = 'expand'
+                    alert_transition_start = current_time_loop
+                    alert_state = 'animating'
+                    alert_full_end_time = current_time_loop + ALERT_FULL_DISPLAY_SECONDS
                     last_alert_cycle = current_time_loop
 
-                if current_time_loop < alert_show_full_until:
-                    # Show the full alert box briefly
-                    draw_alert_box(screen, global_alerts_data[alert_index])
-                else:
-                    # Show compact, non-blocking ticker
-                    draw_alert_ticker(screen, global_alerts_data[alert_index])
+                # Handle animation / states
+                if alert_state == 'animating':
+                    t = (current_time_loop - alert_transition_start) / ALERT_TRANSITION_DURATION
+                    t = max(0.0, min(1.0, t))
+                    if alert_transition_direction == 'expand':
+                        bar_h = _lerp(ALERT_TICKER_HEIGHT, ICON_SIZE, t)
+                        icon_s = _lerp(ALERT_TICKER_HEIGHT, ICON_SIZE, t)
+                        # alpha: fade out (0-25%), hold hidden (25-75%), fade in (75-100%)
+                        if t < 0.25:
+                            a = _lerp(255, 0, t / 0.25)
+                        elif t < 0.75:
+                            a = 0
+                        else:
+                            a = _lerp(0, 255, (t - 0.75) / 0.25)
+                        draw_alert_overlay(screen, global_alerts_data[alert_index], bar_h, icon_s, a)
+                        if t >= 1.0:
+                            alert_state = 'full'
+                            alert_show_full_until = alert_full_end_time
+                    else:  # collapse
+                        bar_h = _lerp(ICON_SIZE, ALERT_TICKER_HEIGHT, t)
+                        icon_s = _lerp(ICON_SIZE, ALERT_TICKER_HEIGHT, t)
+                        if t < 0.25:
+                            a = _lerp(255, 0, t / 0.25)
+                        elif t < 0.75:
+                            a = 0
+                        else:
+                            a = _lerp(0, 255, (t - 0.75) / 0.25)
+                        draw_alert_overlay(screen, global_alerts_data[alert_index], bar_h, icon_s, a)
+                        if t >= 1.0:
+                            alert_state = 'ticker'
+
+                elif alert_state == 'full':
+                    # If full display time expired, start collapse animation
+                    if current_time_loop >= alert_show_full_until:
+                        alert_transition_direction = 'collapse'
+                        alert_transition_start = current_time_loop
+                        alert_state = 'animating'
+                    else:
+                        draw_alert_overlay(screen, global_alerts_data[alert_index], ICON_SIZE, ICON_SIZE, 255)
+
+                else:  # ticker
+                    draw_alert_overlay(screen, global_alerts_data[alert_index], ALERT_TICKER_HEIGHT, ALERT_TICKER_HEIGHT, 255)
 
     pygame.display.flip()
     clock.tick(FPS)
